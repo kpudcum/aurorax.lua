@@ -337,18 +337,28 @@ function Aurora:CreateWindow(titleText, subtitle)
 	subtitleLabel.Parent = top
 	onThemeChange(function(k, c) if k == "dim" then subtitleLabel.TextColor3 = c end end)
 
-	local searchBox = new("Frame", { Size = UDim2.fromOffset(210, 32), Position = UDim2.new(1, -330, 0, 11), BackgroundColor3 = T.row, BorderSizePixel = 0 }, { corner(10), stroke(T.line, 1, 0.3) })
+	local searchBox = new("Frame", { Size = UDim2.fromOffset(210, 32), Position = UDim2.new(1, -330, 0, 11), BackgroundColor3 = T.row, BorderSizePixel = 0, ClipsDescendants = true }, { corner(10), stroke(T.line, 1, 0.3) })
 	onThemeChange(function(k, c) if k == "row" then searchBox.BackgroundColor3 = c end end)
 	label({ Text = "?", TextSize = 17, TextColor3 = T.dim, TextXAlignment = Enum.TextXAlignment.Center, Size = UDim2.fromOffset(30, 32) }).Parent = searchBox
 	local search = new("TextBox", {
 		Size = UDim2.new(1, -38, 1, 0), Position = UDim2.fromOffset(30, 0), BackgroundTransparency = 1, Text = "", PlaceholderText = "Search features...",
 		PlaceholderColor3 = T.dim, TextColor3 = T.text, Font = Enum.Font.GothamMedium, TextSize = 12, ClearTextOnFocus = false, TextXAlignment = Enum.TextXAlignment.Left,
+		ClipsDescendants = true, TextWrapped = false, MultiLine = false,
 	})
 	search.Parent = searchBox
 	searchBox.Parent = top
 	local sStroke = searchBox:FindFirstChildOfClass("UIStroke")
-	search.Focused:Connect(function() tween(sStroke, 0.2, { Color = accent, Transparency = 0 }) end)
-	search.FocusLost:Connect(function() tween(sStroke, 0.2, { Color = T.line, Transparency = 0.3 }) end)
+	local sFocused = false
+	search.Focused:Connect(function()
+		sFocused = true
+		tween(sStroke, 0.2, { Color = accent, Transparency = 0 })
+	end)
+	search.FocusLost:Connect(function()
+		sFocused = false
+		tween(sStroke, 0.2, { Color = T.line, Transparency = 0.3 })
+	end)
+	onAccent(function(a) if sFocused then sStroke.Color = a end end)
+	onThemeChange(function(k, c) if k == "line" and not sFocused then sStroke.Color = c end end)
 
 	local function topBtn(txt, x, hover)
 		local b = new("TextButton", { Text = txt, Size = UDim2.fromOffset(32, 32), Position = UDim2.new(1, x, 0, 11), BackgroundColor3 = hover, BackgroundTransparency = 1, TextColor3 = T.sub, Font = Enum.Font.GothamBold, TextSize = 13, AutoButtonColor = false }, { corner(10) })
@@ -465,6 +475,31 @@ function Aurora:CreateWindow(titleText, subtitle)
 	launcher.MouseEnter:Connect(function() tween(lScale, 0.15, { Scale = lBase * 1.1 }) end)
 	launcher.MouseLeave:Connect(function() tween(lScale, 0.15, { Scale = lBase }) end)
 
+	-- kutuyu basili tutup surukle (mouse ve dokunmatik)
+	local lMoved = false
+	do
+		local ldrag, lstartIn, lstartPos = false, nil, nil
+		launcher.InputBegan:Connect(function(i)
+			if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+				ldrag, lMoved, lstartIn, lstartPos = true, false, i.Position, launcher.Position
+				i.Changed:Connect(function() if i.UserInputState == Enum.UserInputState.End then ldrag = false end end)
+			end
+		end)
+		table.insert(conns, UIS.InputChanged:Connect(function(i)
+			if ldrag and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then
+				local d = i.Position - lstartIn
+				if not lMoved and d.Magnitude > 8 then lMoved = true end
+				if lMoved then
+					local vp = workspace.CurrentCamera.ViewportSize
+					local sz = 58 * lScale.Scale
+					local nx = math.clamp(lstartPos.X.Offset + d.X, 0, math.max(0, vp.X - sz))
+					local ny = math.clamp(lstartPos.Y.Offset + d.Y, -math.max(0, vp.Y - sz), 0)
+					launcher.Position = UDim2.new(lstartPos.X.Scale, math.floor(nx), lstartPos.Y.Scale, math.floor(ny))
+				end
+			end
+		end))
+	end
+
 	local isOpen, snapped = false, false
 	local function setOpen(v)
 		isOpen = v
@@ -502,14 +537,31 @@ function Aurora:CreateWindow(titleText, subtitle)
 			end
 		end)
 	end)
-	launcher.MouseButton1Click:Connect(function() setOpen(true) end)
+	launcher.MouseButton1Click:Connect(function()
+		if lMoved then lMoved = false return end -- surukleme tiklama sayilmasin
+		setOpen(true)
+	end)
 
 	------------------------------------------------ ARAMA
+	local searchToken = 0
 	search:GetPropertyChangedSignal("Text"):Connect(function()
-		local q = string.lower(search.Text)
-		for _, r in ipairs(rows) do
-			r.frame.Visible = q == "" or string.find(r.name, q, 1, true) ~= nil
+		-- cok uzun yazi kutudan tasmasin / fps dusurmesin: 32 karakterle sinirla
+		if #search.Text > 32 then
+			search.Text = string.sub(search.Text, 1, 32)
+			return
 		end
+		-- her tusta tum satirlari taramak yerine kisa bir bekleme (debounce) ile bir kez filtrele
+		searchToken = searchToken + 1
+		local my = searchToken
+		task.delay(0.12, function()
+			if my ~= searchToken then return end
+			local q = string.lower(search.Text)
+			for _, r in ipairs(rows) do
+				if r.frame.Parent then
+					r.frame.Visible = q == "" or string.find(r.name, q, 1, true) ~= nil
+				end
+			end
+		end)
 	end)
 
 	------------------------------------------------ SEKMELER
