@@ -238,6 +238,25 @@ function Aurora:Notify(title, body, duration, kind)
 	end)
 end
 
+------------------------------------------------------------------ KONTROL KAYIT DEFTERI (config kaydet/yukle icin)
+local CTL = { list = {}, map = {} }
+local function regCtl(sid, lbl, kind, get, set)
+	local k0 = sid .. "/" .. tostring(lbl)
+	-- tema kontrolleri ayri yakalanir, config bolumunun kendisi kaydedilmez
+	if sid == "Settings/Config" or sid == "Settings/Theme Packs & Backgrounds" or sid == "Settings/Theme Backgrounds"
+		or k0 == "Settings/Appearance & Scale/Theme" or k0 == "Settings/Appearance & Scale/Custom accent" then
+		return
+	end
+	local key, n = k0, 1
+	while CTL.map[key] do
+		n = n + 1
+		key = k0 .. "#" .. n
+	end
+	local e = { key = key, kind = kind, get = get, set = set }
+	CTL.map[key] = e
+	table.insert(CTL.list, e)
+end
+
 ------------------------------------------------------------------ PENCERE & UI MIMARISI
 function Aurora:CreateWindow(titleText, subtitle)
 	local Window = {}
@@ -718,6 +737,7 @@ function Aurora:CreateWindow(titleText, subtitle)
 		local Tab = {}
 
 		function Tab:AddSection(title, collapsed)
+			local sid = name .. "/" .. title
 			local card = new("Frame", { Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundColor3 = T.card, BackgroundTransparency = 0.15, BorderSizePixel = 0, LayoutOrder = #scroll:GetChildren() }, { corner(14), stroke(T.line, 1, 0.35), list(0) })
 			onThemeChange(function(k, c) if k == "card" then card.BackgroundColor3 = c end end)
 			local head = new("TextButton", { Text = "", Size = UDim2.new(1, 0, 0, 38), BackgroundTransparency = 1, AutoButtonColor = false, LayoutOrder = 0 })
@@ -871,7 +891,12 @@ function Aurora:CreateWindow(titleText, subtitle)
 					paint(true)
 					if cb then task.spawn(cb, state) end
 				end)
-				return { Set = function(v) state = v and true or false paint(true) if cb then task.spawn(cb, state) end end }
+				local obj = {
+					Set = function(v) state = v and true or false paint(true) if cb then task.spawn(cb, state) end end,
+					Get = function() return state end,
+				}
+				regCtl(sid, t, "toggle", obj.Get, obj.Set)
+				return obj
 			end
 
 			function Section:AddSlider(t, min, max, default, cb, step)
@@ -905,7 +930,12 @@ function Aurora:CreateWindow(titleText, subtitle)
 					if fire and cb then cb(value) end
 				end
 				makeDrag(track, function(rel) setRel(rel, true) end)
-				return { Set = function(v) setRel((v - min) / (max - min), true) end }
+				local obj = {
+					Set = function(v) setRel((v - min) / (max - min), true) end,
+					Get = function() return value end,
+				}
+				regCtl(sid, t, "slider", obj.Get, obj.Set)
+				return obj
 			end
 
 			function Section:AddDropdown(t, options, default, cb)
@@ -949,6 +979,18 @@ function Aurora:CreateWindow(titleText, subtitle)
 					tween(r, 0.3, { Size = UDim2.new(1, 0, 0, open and openH or 40) })
 					tween(arr, 0.25, { Rotation = open and 180 or 0 })
 				end)
+				local obj = {
+					Get = function() return btns[current] and current or nil end,
+					Set = function(v)
+						if not btns[v] then return end
+						current = v
+						cur.Text = v
+						paintSel()
+						if cb then task.spawn(cb, v) end
+					end,
+				}
+				regCtl(sid, t, "dropdown", obj.Get, obj.Set)
+				return obj
 			end
 
 			function Section:AddKeybind(t, default, cb)
@@ -1006,6 +1048,17 @@ function Aurora:CreateWindow(titleText, subtitle)
 						end
 					end
 				end))
+				local obj = {
+					Get = function() return key end,
+					Set = function(b)
+						if type(b) ~= "table" or not b.value then return end
+						key = b
+						kb.Text = getBindName(key)
+						if cb then task.spawn(cb, key) end
+					end,
+				}
+				regCtl(sid, t, "keybind", obj.Get, obj.Set)
+				return obj
 			end
 
 			function Section:AddColorPicker(t, default, cb)
@@ -1036,13 +1089,27 @@ function Aurora:CreateWindow(titleText, subtitle)
 					ColorSequenceKeypoint.new(0.67, Color3.fromHSV(0.67, 1, 1)), ColorSequenceKeypoint.new(0.83, Color3.fromHSV(0.83, 1, 1)),
 					ColorSequenceKeypoint.new(1, Color3.fromHSV(1, 1, 1)),
 				})
-				bar(48, hueSeq, function(rel) h = rel apply() end).Position = UDim2.fromScale(h, 0.5)
-				bar(70, ColorSequence.new(Color3.new(0, 0, 0), Color3.new(1, 1, 1)), function(rel) v = rel apply() end).Position = UDim2.fromScale(v, 0.5)
+				local hueK = bar(48, hueSeq, function(rel) h = rel apply() end)
+				hueK.Position = UDim2.fromScale(h, 0.5)
+				local valK = bar(70, ColorSequence.new(Color3.new(0, 0, 0), Color3.new(1, 1, 1)), function(rel) v = rel apply() end)
+				valK.Position = UDim2.fromScale(v, 0.5)
 				local open = false
 				head.MouseButton1Click:Connect(function()
 					open = not open
 					tween(r, 0.3, { Size = UDim2.new(1, 0, 0, open and 96 or 40) })
 				end)
+				local obj = {
+					Get = function() return Color3.fromHSV(h, s, v) end,
+					Set = function(c)
+						if typeof(c) ~= "Color3" then return end
+						h, s, v = c:ToHSV()
+						hueK.Position = UDim2.fromScale(h, 0.5)
+						valK.Position = UDim2.fromScale(v, 0.5)
+						apply()
+					end,
+				}
+				regCtl(sid, t, "color", obj.Get, obj.Set)
+				return obj
 			end
 
 			function Section:AddTextbox(t, placeholder, cb)
@@ -1292,6 +1359,7 @@ function Aurora:CreateWindow(titleText, subtitle)
 			task.wait(0.25)
 			splash:Destroy()
 			setOpen(true)
+			if Window.AfterOpen then task.spawn(Window.AfterOpen) end
 		end)
 	end
 
@@ -3174,11 +3242,348 @@ sThemeBg:AddColorPicker("Sub Text Color", T.sub, function(c) Aurora:UpdateThemeC
 sThemeBg:AddColorPicker("Dim Text Color", T.dim, function(c) Aurora:UpdateThemeColor("dim", c) end)
 sThemeBg:AddColorPicker("Scrollbar Color", T.scroll, function(c) Aurora:UpdateThemeColor("scroll", c) end)
 
-local s2 = Settings:AddSection("Config")
-s2:AddTextbox("Profile name", "type here", function(txt, enter)
-	if txt ~= "" then Aurora:Notify("Saved", "Profil: " .. txt, 3, "success") end
-end)
-s2:AddButton("Reload UI", function() Aurora:Notify("Aurora X", "Zaten guncel.", 2.5) end)
+local sCfg = Settings:AddSection("Config")
+do
+	local HttpService = game:GetService("HttpService")
+	local FILE = "AuroraX_UIConfigs.json"
+	local canFile = type(writefile) == "function" and type(readfile) == "function"
+	local store = { profiles = {}, last = nil, ask = true }
+	local THEME_KEYS = { "bg0", "bg1", "side", "card", "row", "row2", "line", "text", "sub", "dim", "scroll" }
+	local WHITE = Color3.new(1, 1, 1)
+
+	-- hook'suz basit etiket (liste/popup tekrar tekrar olusturulur)
+	local function lbl(p)
+		p.BackgroundTransparency = 1
+		p.Font = p.Font or Enum.Font.GothamMedium
+		p.TextSize = p.TextSize or 13
+		p.TextColor3 = p.TextColor3 or T.text
+		p.TextXAlignment = p.TextXAlignment or Enum.TextXAlignment.Left
+		return new("TextLabel", p)
+	end
+
+	------------------------------------------------ dosya islemleri
+	if canFile then
+		pcall(function()
+			if type(isfile) == "function" and isfile(FILE) then
+				local d = HttpService:JSONDecode(readfile(FILE))
+				if type(d) == "table" then
+					if type(d.profiles) == "table" then store.profiles = d.profiles end
+					if type(d.last) == "string" then store.last = d.last end
+					if d.ask == false then store.ask = false end
+				end
+			end
+		end)
+	end
+	local warnedNoFile = false
+	local function writeStore()
+		if not canFile then
+			if not warnedNoFile then
+				warnedNoFile = true
+				Aurora:Notify("Config", "Dosya sistemi yok: kayitlar sadece bu oturumda kalir.", 5, "warn")
+			end
+			return false
+		end
+		return pcall(function()
+			writefile(FILE, HttpService:JSONEncode({ profiles = store.profiles, last = store.last, ask = store.ask }))
+		end)
+	end
+
+	------------------------------------------------ serilestirme
+	local function colSer(c) return { r = c.R, g = c.G, b = c.B } end
+	local function colDeser(t)
+		if type(t) == "table" and t.r and t.g and t.b then return Color3.new(t.r, t.g, t.b) end
+		return nil
+	end
+	local function ser(kind, v)
+		if kind == "color" then return colSer(v) end
+		if kind == "keybind" then
+			if typeof(v) == "EnumItem" then
+				return { kind = (v.EnumType == Enum.UserInputType) and "mouse" or "key", name = v.Name }
+			elseif type(v) == "table" and v.value then
+				return { kind = v.kind, name = v.value.Name }
+			end
+			return nil
+		end
+		return v
+	end
+	local function deser(kind, v)
+		if kind == "color" then return colDeser(v) end
+		if kind == "keybind" then
+			if type(v) == "table" and v.name then
+				local ok, e = pcall(function()
+					if v.kind == "mouse" then return Enum.UserInputType[v.name] end
+					return Enum.KeyCode[v.name]
+				end)
+				if ok and e then return { kind = v.kind, value = e } end
+			end
+			return nil
+		end
+		return v
+	end
+
+	local function captureTheme()
+		local th = { accent = colSer(savedAccent), keys = {} }
+		for _, k in ipairs(THEME_KEYS) do th.keys[k] = colSer(T[k]) end
+		return th
+	end
+	local function applyTheme(th)
+		if type(th) ~= "table" then return end
+		local a = colDeser(th.accent)
+		if a then Aurora:SetAccent(a, true) end
+		if type(th.keys) == "table" then
+			for _, k in ipairs(THEME_KEYS) do
+				local c = colDeser(th.keys[k])
+				if c then Aurora:UpdateThemeColor(k, c) end
+			end
+		end
+	end
+
+	local function capture()
+		local items, on = {}, 0
+		for _, e in ipairs(CTL.list) do
+			local ok, v = pcall(e.get)
+			if ok and v ~= nil then
+				local sv = ser(e.kind, v)
+				if sv ~= nil then
+					table.insert(items, { k = e.key, v = sv })
+					if e.kind == "toggle" and v == true then on = on + 1 end
+				end
+			end
+		end
+		return items, on
+	end
+
+	local applying = false
+	local function applyProfile(name)
+		local prof = store.profiles[name]
+		if not prof or applying then return end
+		applying = true
+		task.spawn(function()
+			pcall(applyTheme, prof.theme)
+			local n = 0
+			for i, it in ipairs(prof.items or {}) do
+				local e = CTL.map[it.k]
+				if e then
+					local v = deser(e.kind, it.v)
+					if v ~= nil and pcall(e.set, v) then n = n + 1 end
+				end
+				if i % 10 == 0 then task.wait() end
+			end
+			applying = false
+			store.last = name
+			writeStore()
+			Aurora:Notify("Config yuklendi", name .. " - " .. n .. " ayar uygulandi", 3.5, "success")
+		end)
+	end
+
+	------------------------------------------------ liste arayuzu
+	local refresh
+	local pendingRefresh = false
+	local rowFrames = {}
+
+	local function makeRow(i, name, prof)
+		local isLast = name == store.last
+		local r = new("Frame", { Size = UDim2.new(1, 0, 0, 64), BackgroundColor3 = T.row, BorderSizePixel = 0, LayoutOrder = i }, { corner(12), stroke(isLast and accent or T.line, 1, isLast and 0.35 or 0.55) })
+		table.insert(rowFrames, r)
+
+		local ic = new("Frame", { Size = UDim2.fromOffset(40, 40), Position = UDim2.fromOffset(12, 12), BackgroundColor3 = WHITE, BorderSizePixel = 0 }, { corner(12) })
+		accentGrad(ic, 45)
+		new("Frame", { Size = UDim2.fromOffset(20, 20), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), BackgroundColor3 = WHITE, BorderSizePixel = 0 }, { corner(4) }).Parent = ic
+		new("Frame", { Size = UDim2.fromOffset(11, 6), AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0.5, -10), BackgroundColor3 = T.bg0, BorderSizePixel = 0, ZIndex = 2 }, { corner(2) }).Parent = ic
+		new("Frame", { Size = UDim2.fromOffset(11, 6), AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 0.5, 8), BackgroundColor3 = T.bg0, BorderSizePixel = 0, ZIndex = 2 }, { corner(2) }).Parent = ic
+		ic.Parent = r
+
+		lbl({ Text = name, Font = Enum.Font.GothamBold, TextSize = 14, TextTruncate = Enum.TextTruncate.AtEnd, Size = UDim2.new(1, -190, 0, 20), Position = UDim2.fromOffset(62, 12) }).Parent = r
+		lbl({
+			Text = string.format("%d ayar - %d acik - %s", prof.n or 0, prof.on or 0, os.date("%d.%m %H:%M", prof.saved or os.time())),
+			TextSize = 11, TextColor3 = T.dim, TextTruncate = Enum.TextTruncate.AtEnd, Size = UDim2.new(1, -190, 0, 16), Position = UDim2.fromOffset(62, 34),
+		}).Parent = r
+
+		local load = new("TextButton", { Text = "LOAD", Size = UDim2.fromOffset(58, 28), Position = UDim2.new(1, -130, 0.5, -14), BackgroundColor3 = WHITE, Font = Enum.Font.GothamBlack, TextSize = 11, TextColor3 = WHITE, AutoButtonColor = false, BorderSizePixel = 0 }, { corner(10) })
+		accentGrad(load, 0)
+		load.Parent = r
+		load.MouseButton1Click:Connect(function() applyProfile(name) end)
+
+		local del = new("TextButton", { Text = "DELETE", Size = UDim2.fromOffset(58, 28), Position = UDim2.new(1, -68, 0.5, -14), BackgroundColor3 = T.row2, Font = Enum.Font.GothamBold, TextSize = 10, TextColor3 = T.err, AutoButtonColor = false, BorderSizePixel = 0 }, { corner(10), stroke(T.err, 1, 0.6) })
+		del.Parent = r
+		local armed = false
+		del.MouseButton1Click:Connect(function()
+			if not armed then
+				armed = true
+				del.Text = "SURE?"
+				tween(del, 0.15, { BackgroundColor3 = T.err, TextColor3 = WHITE })
+				task.delay(2, function()
+					if armed and del.Parent then
+						armed = false
+						del.Text = "DELETE"
+						tween(del, 0.15, { BackgroundColor3 = T.row2, TextColor3 = T.err })
+					end
+				end)
+				return
+			end
+			armed = false
+			store.profiles[name] = nil
+			if store.last == name then
+				local best, bt
+				for n2, p2 in pairs(store.profiles) do
+					if not bt or (p2.saved or 0) > bt then best, bt = n2, (p2.saved or 0) end
+				end
+				store.last = best
+			end
+			writeStore()
+			Aurora:Notify("Config silindi", name, 3, "warn")
+			refresh()
+		end)
+	end
+
+	------------------------------------------------ bolum icerigi
+	local nameText = ""
+	sCfg:AddTextbox("Config name", "ornek: ESP acik", function(txt) nameText = txt or "" end)
+	sCfg:AddButton("Save Current UI", function()
+		local nm = string.sub((nameText:gsub("^%s+", ""):gsub("%s+$", "")), 1, 24)
+		if nm == "" then
+			local c = 0
+			for _ in pairs(store.profiles) do c = c + 1 end
+			nm = "Config " .. (c + 1)
+		end
+		local items, on = capture()
+		store.profiles[nm] = { saved = os.time(), items = items, on = on, n = #items, theme = captureTheme() }
+		store.last = nm
+		writeStore()
+		Aurora:Notify("Config kaydedildi", nm .. " - " .. #items .. " ayar, " .. on .. " acik ozellik", 3.5, "success")
+		refresh()
+	end)
+	sCfg:AddButton("Load Last Config", function()
+		if store.last and store.profiles[store.last] then
+			applyProfile(store.last)
+		else
+			Aurora:Notify("Config", "Kayitli config yok.", 3, "warn")
+		end
+	end)
+	local askToggle = sCfg:AddToggle("Ask to load on open", store.ask, function(on)
+		store.ask = on
+		writeStore()
+	end)
+	local listBox = sCfg:AddContainer()
+
+	onThemeChange(function(k)
+		if k == "row" or k == "text" or k == "sub" or k == "dim" or k == "bg0" or k == "err" then
+			if pendingRefresh then return end
+			pendingRefresh = true
+			task.delay(0.2, function()
+				pendingRefresh = false
+				if refresh and listBox.Parent then refresh() end
+			end)
+		end
+	end)
+
+	refresh = function()
+		for _, ch in ipairs(listBox:GetChildren()) do
+			if ch:IsA("GuiObject") then ch:Destroy() end
+		end
+		rowFrames = {}
+		local names = {}
+		for n in pairs(store.profiles) do table.insert(names, n) end
+		table.sort(names, function(a, b) return (store.profiles[a].saved or 0) > (store.profiles[b].saved or 0) end)
+		if #names == 0 then
+			lbl({ Text = "Henuz kayitli config yok. Ozellikleri ac (ornek: ESP), isim yaz ve 'Save Current UI'a bas.", TextSize = 11, TextColor3 = T.dim, TextWrapped = true, Size = UDim2.new(1, -20, 0, 36), Position = UDim2.fromOffset(10, 0) }).Parent = listBox
+			return
+		end
+		for i, n in ipairs(names) do makeRow(i, n, store.profiles[n]) end
+	end
+	-- listBox bos satir boyu 0: otomatik boyut icin etiket yuksekligi
+	refresh()
+
+	------------------------------------------------ acilista sorulan popup
+	local function showPrompt(name)
+		local prof = store.profiles[name]
+		if not prof or not gui.Parent then return end
+		local cam = workspace.CurrentCamera
+		local vp = cam and cam.ViewportSize or Vector2.new(1280, 720)
+		local fit = math.clamp(math.min((vp.X - 24) / 350, (vp.Y - 24) / 290), 0.5, 1)
+
+		local overlay = new("TextButton", { Text = "", AutoButtonColor = false, Size = UDim2.fromScale(1, 1), BackgroundColor3 = Color3.new(0, 0, 0), BackgroundTransparency = 1, BorderSizePixel = 0, ZIndex = 200 })
+		overlay.Parent = gui
+		tween(overlay, 0.3, { BackgroundTransparency = 0.5 })
+
+		local card = new("CanvasGroup", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(350, 272), BackgroundColor3 = T.bg0, BorderSizePixel = 0, GroupTransparency = 1, ZIndex = 201 }, { corner(20), stroke(accent, 1.6, 0.15) })
+		local cs = new("UIScale", { Scale = fit * 0.85 })
+		cs.Parent = card
+
+		local band = new("Frame", { Size = UDim2.new(1, 0, 0, 92), BackgroundColor3 = WHITE, BorderSizePixel = 0 })
+		accentGrad(band, 25)
+		new("Frame", { Size = UDim2.fromOffset(130, 130), Position = UDim2.fromOffset(-34, -56), BackgroundColor3 = WHITE, BackgroundTransparency = 0.88, BorderSizePixel = 0 }, { corner(65) }).Parent = band
+		new("Frame", { Size = UDim2.fromOffset(96, 96), Position = UDim2.new(1, -64, 0, 26), BackgroundColor3 = WHITE, BackgroundTransparency = 0.9, BorderSizePixel = 0 }, { corner(48) }).Parent = band
+		local icw = new("Frame", { Size = UDim2.fromOffset(60, 60), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), BackgroundColor3 = WHITE, BackgroundTransparency = 0.8, BorderSizePixel = 0 }, { corner(19), stroke(WHITE, 1.5, 0.5) })
+		new("Frame", { Size = UDim2.fromOffset(30, 30), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), BackgroundColor3 = WHITE, BorderSizePixel = 0 }, { corner(6) }).Parent = icw
+		new("Frame", { Size = UDim2.fromOffset(16, 9), AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0.5, -15), BackgroundColor3 = T.bg0, BorderSizePixel = 0, ZIndex = 2 }, { corner(3) }).Parent = icw
+		new("Frame", { Size = UDim2.fromOffset(16, 9), AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 0.5, 12), BackgroundColor3 = T.bg0, BorderSizePixel = 0, ZIndex = 2 }, { corner(3) }).Parent = icw
+		icw.Parent = band
+		band.Parent = card
+
+		lbl({ Text = "KAYITLI CONFIG BULUNDU", Font = Enum.Font.GothamBlack, TextSize = 15, TextXAlignment = Enum.TextXAlignment.Center, Size = UDim2.new(1, 0, 0, 20), Position = UDim2.fromOffset(0, 104) }).Parent = card
+		lbl({ Text = "Bu config'i simdi yuklemek istiyor musunuz?", TextSize = 12, TextColor3 = T.sub, TextXAlignment = Enum.TextXAlignment.Center, Size = UDim2.new(1, -24, 0, 16), Position = UDim2.fromOffset(12, 127) }).Parent = card
+
+		local chip = new("Frame", { Size = UDim2.new(1, -40, 0, 50), Position = UDim2.fromOffset(20, 152), BackgroundColor3 = T.row, BorderSizePixel = 0 }, { corner(12), stroke(T.line, 1, 0.4) })
+		local dot = new("Frame", { Size = UDim2.fromOffset(8, 8), Position = UDim2.fromOffset(14, 21), BackgroundColor3 = accent, BorderSizePixel = 0 }, { corner(4) })
+		dot.Parent = chip
+		lbl({ Text = name, Font = Enum.Font.GothamBold, TextSize = 14, TextTruncate = Enum.TextTruncate.AtEnd, Size = UDim2.new(1, -46, 0, 18), Position = UDim2.fromOffset(32, 8) }).Parent = chip
+		lbl({ Text = string.format("%d ayar - %d acik - %s", prof.n or 0, prof.on or 0, os.date("%d.%m %H:%M", prof.saved or os.time())), TextSize = 11, TextColor3 = T.dim, TextTruncate = Enum.TextTruncate.AtEnd, Size = UDim2.new(1, -46, 0, 16), Position = UDim2.fromOffset(32, 27) }).Parent = chip
+		chip.Parent = card
+
+		local closed = false
+		local function close(after)
+			if closed then return end
+			closed = true
+			tween(cs, 0.2, { Scale = fit * 0.9 }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+			tween(card, 0.2, { GroupTransparency = 1 })
+			tween(overlay, 0.25, { BackgroundTransparency = 1 })
+			task.delay(0.28, function()
+				card:Destroy()
+				overlay:Destroy()
+				if after then after() end
+			end)
+		end
+
+		local function mkBtn(text, x, primary, cb)
+			local b = new("TextButton", {
+				Text = text, Size = UDim2.fromOffset(150, 38), Position = UDim2.fromOffset(x, 214), Font = Enum.Font.GothamBlack, TextSize = 13,
+				AutoButtonColor = false, BorderSizePixel = 0, BackgroundColor3 = primary and WHITE or T.row, TextColor3 = primary and WHITE or T.text,
+			}, { corner(12) })
+			local bs = new("UIScale", { Scale = 1 })
+			bs.Parent = b
+			if primary then accentGrad(b, 0) else stroke(T.line, 1, 0.2).Parent = b end
+			b.MouseEnter:Connect(function() tween(bs, 0.12, { Scale = 1.05 }) end)
+			b.MouseLeave:Connect(function() tween(bs, 0.12, { Scale = 1 }) end)
+			b.MouseButton1Click:Connect(cb)
+			b.Parent = card
+		end
+		mkBtn("EVET, YUKLE", 20, true, function() close(function() applyProfile(name) end) end)
+		mkBtn("HAYIR", 180, false, function() close() end)
+
+		local never = new("TextButton", { Text = "Bir daha sorma", Size = UDim2.new(1, 0, 0, 16), Position = UDim2.fromOffset(0, 254), BackgroundTransparency = 1, Font = Enum.Font.GothamMedium, TextSize = 11, TextColor3 = T.dim, AutoButtonColor = false })
+		never.MouseEnter:Connect(function() tween(never, 0.15, { TextColor3 = T.text }) end)
+		never.MouseLeave:Connect(function() tween(never, 0.15, { TextColor3 = T.dim }) end)
+		never.MouseButton1Click:Connect(function()
+			askToggle.Set(false)
+			Aurora:Notify("Config", "Acilista sorma kapatildi. Settings > Config'ten tekrar acabilirsin.", 4)
+			close()
+		end)
+		never.Parent = card
+
+		card.Parent = gui
+		tween(cs, 0.45, { Scale = fit }, Enum.EasingStyle.Back)
+		tween(card, 0.3, { GroupTransparency = 0 })
+	end
+
+	Window.AfterOpen = function()
+		if not store.ask then return end
+		local n = store.last
+		if not n or not store.profiles[n] then return end
+		task.wait(0.45)
+		showPrompt(n)
+	end
+end
 
 Window:Open()
 return Aurora
