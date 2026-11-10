@@ -3102,7 +3102,41 @@ do
 		-- golgeleri kapat
 		saved.shadows = Lighting.GlobalShadows
 		pcall(function() Lighting.GlobalShadows = false end)
-		-- render kalitesini dusur (FPS'i en cok etkileyen ayar)
+		-- en agir isleme teknolojisinden en hafifine gec: tek basina en buyuk FPS kazancini bu verir
+		saved.technology = Lighting.Technology
+		pcall(function() Lighting.Technology = Enum.Technology.Compatibility end)
+		-- atmosfer (sis/pus) ve gokyuzundeki yildizlari sifirla
+		local atm = Lighting:FindFirstChildOfClass("Atmosphere")
+		if atm then
+			saved.atmosphere = { inst = atm, density = atm.Density, haze = atm.Haze, glare = atm.Glare }
+			pcall(function() atm.Density, atm.Haze, atm.Glare = 0, 0, 0 end)
+		end
+		local sky = Lighting:FindFirstChildOfClass("Sky")
+		if sky then
+			saved.sky = { inst = sky, stars = sky.StarCount, bodies = sky.CelestialBodiesShown }
+			pcall(function()
+				sky.StarCount = 0
+				sky.CelestialBodiesShown = false
+			end)
+		end
+		-- terrain suslemesini ve su dalgalarini kapat
+		local terrain = workspace:FindFirstChildOfClass("Terrain")
+		if terrain then
+			saved.terrain = { decoration = terrain.Decoration, waveSize = terrain.WaterWaveSize, waveSpeed = terrain.WaterWaveSpeed }
+			pcall(function()
+				terrain.Decoration = false
+				terrain.WaterWaveSize = 0
+				terrain.WaterWaveSpeed = 0
+			end)
+		end
+		-- yuklenen/cizilen alani daraltarak ayni anda islenen parca sayisini dusur
+		saved.streamMin = workspace.StreamingMinRadius
+		saved.streamTarget = workspace.StreamingTargetRadius
+		pcall(function()
+			workspace.StreamingMinRadius = 128
+			workspace.StreamingTargetRadius = 512
+		end)
+		-- render kalitesini en alt seviyeye cek
 		pcall(function()
 			local gs = UserSettings():GetService("UserGameSettings")
 			saved.quality = gs.SavedQualityLevel
@@ -3118,10 +3152,35 @@ do
 			if inst and inst.Parent then pcall(function() inst.Enabled = true end) end
 		end
 		if saved.shadows ~= nil then pcall(function() Lighting.GlobalShadows = saved.shadows end) end
+		if saved.technology then pcall(function() Lighting.Technology = saved.technology end) end
+		if saved.atmosphere then
+			local a = saved.atmosphere
+			pcall(function() a.inst.Density, a.inst.Haze, a.inst.Glare = a.density, a.haze, a.glare end)
+		end
+		if saved.sky then
+			local sk = saved.sky
+			pcall(function()
+				sk.inst.StarCount = sk.stars
+				sk.inst.CelestialBodiesShown = sk.bodies
+			end)
+		end
+		if saved.terrain then
+			local t = saved.terrain
+			local terrain = workspace:FindFirstChildOfClass("Terrain")
+			if terrain then
+				pcall(function()
+					terrain.Decoration = t.decoration
+					terrain.WaterWaveSize = t.waveSize
+					terrain.WaterWaveSpeed = t.waveSpeed
+				end)
+			end
+		end
+		if saved.streamMin then pcall(function() workspace.StreamingMinRadius = saved.streamMin end) end
+		if saved.streamTarget then pcall(function() workspace.StreamingTargetRadius = saved.streamTarget end) end
 		if saved.quality then
 			pcall(function() UserSettings():GetService("UserGameSettings").SavedQualityLevel = saved.quality end)
 		end
-		saved = { fx = {}, light = {}, quality = nil, shadows = nil }
+		saved = { fx = {}, light = {} }
 	end
 
 	-- booster acikken sonradan eklenen efektleri de (patlama, buyu vb.) yakalayip kapatir
@@ -3139,7 +3198,7 @@ do
 	end)
 	gui.Destroying:Connect(function() if active then revertBoost() end end)
 
-	sv3:AddLabel("Lowers render quality and disables background effects (particles, trails, post-processing, shadows) to raise FPS.")
+	sv3:AddLabel("Aggressively lowers render quality, lighting technology, shadows and view distance, and disables effects (particles/trails/post-processing) to significantly raise FPS. Visuals will look flatter while enabled.")
 	sv3:AddToggle("FPS Booster", false, function(on)
 		active = on
 		if on then
