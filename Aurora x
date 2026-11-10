@@ -158,6 +158,11 @@ local TR_EN = {
 	[" ayar, "] = " settings, ",
 	[" acik ozellik"] = " features on",
 	["Henuz kayitli config yok. Ozellikleri ac (ornek: ESP), isim yaz ve 'Save Current UI'a bas."] = "No saved config yet. Turn on some features (e.g. ESP), type a name and press 'Save Current UI'.",
+	["KAYITLI CONFIG BULUNDU"] = "SAVED CONFIG FOUND",
+	["Bu config'i simdi yuklemek istiyor musunuz?"] = "Do you want to load this config now?",
+	["EVET, YUKLE"] = "YES, LOAD",
+	["HAYIR"] = "NO",
+	["Bir daha sorma"] = "Don't ask again",
 }
 
 local EN_TR = {
@@ -351,6 +356,17 @@ local EN_TR = {
 	[" ayar, "] = " ayar, ",
 	[" acik ozellik"] = " a\u{E7}\u{131}k \u{F6}zellik",
 	["Henuz kayitli config yok. Ozellikleri ac (ornek: ESP), isim yaz ve 'Save Current UI'a bas."] = "Hen\u{FC}z kay\u{131}tl\u{131} config yok. \u{D6}zellikleri a\u{E7} (\u{F6}rnek: ESP), isim yaz ve 'Mevcut UI'y\u{131} Kaydet'e bas.",
+	["Config name"] = "Config ad\u{131}",
+	["Connection"] = "Ba\u{11F}lant\u{131}",
+	["Coordinates (x y z)"] = "Koordinatlar (x y z)",
+	["Location name"] = "Konum ad\u{131}",
+	["Search player"] = "Oyuncu ara",
+	["Saved Configs"] = "Kay\u{131}tl\u{131} Configler",
+	["KAYITLI CONFIG BULUNDU"] = "KAYITLI CONFIG BULUNDU",
+	["Bu config'i simdi yuklemek istiyor musunuz?"] = "Bu config'i \u{15F}imdi y\u{FC}klemek istiyor musunuz?",
+	["EVET, YUKLE"] = "EVET, Y\u{DC}KLE",
+	["HAYIR"] = "HAYIR",
+	["Bir daha sorma"] = "Bir daha sorma",
 }
 
 local Lang = "tr"
@@ -3765,14 +3781,18 @@ do
 	local THEME_KEYS = { "bg0", "bg1", "side", "card", "row", "row2", "line", "text", "sub", "dim", "scroll" }
 	local WHITE = Color3.new(1, 1, 1)
 
-	-- hook'suz basit etiket (liste/popup tekrar tekrar olusturulur)
+	-- dil destekli etiket: sozlukte varsa cevirir ve dil degisince gunceller (liste/popup tekrar tekrar olusturulur)
 	local function lbl(p)
 		p.BackgroundTransparency = 1
 		p.Font = p.Font or Enum.Font.GothamMedium
 		p.TextSize = p.TextSize or 13
 		p.TextColor3 = p.TextColor3 or T.text
 		p.TextXAlignment = p.TextXAlignment or Enum.TextXAlignment.Left
-		return new("TextLabel", p)
+		local srcText = p.Text
+		p.Text = T_(srcText)
+		local l = new("TextLabel", p)
+		regT(l, srcText)
+		return l
 	end
 
 	------------------------------------------------ dosya islemleri
@@ -4124,10 +4144,10 @@ do
 			b.MouseButton1Click:Connect(cb)
 			b.Parent = card
 		end
-		mkBtn("EVET, YUKLE", 20, true, function() close(function() applyProfile(name) end) end)
-		mkBtn("HAYIR", 180, false, function() close() end)
+		mkBtn(T_("EVET, YUKLE"), 20, true, function() close(function() applyProfile(name) end) end)
+		mkBtn(T_("HAYIR"), 180, false, function() close() end)
 
-		local never = new("TextButton", { Text = "Bir daha sorma", Size = UDim2.new(1, 0, 0, 16), Position = UDim2.fromOffset(0, 254), BackgroundTransparency = 1, Font = Enum.Font.GothamMedium, TextSize = 11, TextColor3 = T.dim, AutoButtonColor = false })
+		local never = new("TextButton", { Text = T_("Bir daha sorma"), Size = UDim2.new(1, 0, 0, 16), Position = UDim2.fromOffset(0, 254), BackgroundTransparency = 1, Font = Enum.Font.GothamMedium, TextSize = 11, TextColor3 = T.dim, AutoButtonColor = false })
 		never.MouseEnter:Connect(function() tween(never, 0.15, { TextColor3 = T.text }) end)
 		never.MouseLeave:Connect(function() tween(never, 0.15, { TextColor3 = T.dim }) end)
 		never.MouseButton1Click:Connect(function()
