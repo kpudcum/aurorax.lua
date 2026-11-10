@@ -3030,7 +3030,7 @@ do
 	gui.Destroying:Connect(clearPlatform)
 
 	sv1b:AddLabel("Creates one fixed spot high above the map and teleports you there. Out of normal players' reach.")
-	sv1b:AddSlider("Safezone Height", 500, 1500, SZ.Height, function(v) SZ.Height = v end, 50)
+	sv1b:AddSlider("Safezone Height", 500, 10000, SZ.Height, function(v) SZ.Height = v end, 100)
 
 	sv1b:AddButton("Go to Safezone", function()
 		local r = rootOf(lp)
@@ -3066,6 +3066,89 @@ do
 		r.CFrame = SZ.Back
 		SZ.Active = false
 		say("Teleported back")
+	end)
+end
+
+local sv3 = ServerTab:AddSection("FPS Booster")
+do
+	local saved = { fx = {}, light = {}, quality = nil, shadows = nil }
+	local active = false
+
+	local FX_CLASSES = { ParticleEmitter = true, Trail = true, Beam = true, Smoke = true, Fire = true, Sparkles = true }
+	local LIGHT_FX = { BloomEffect = true, SunRaysEffect = true, ColorCorrectionEffect = true, DepthOfFieldEffect = true, BlurEffect = true }
+
+	local function disableFx(inst)
+		if saved.fx[inst] == nil then
+			saved.fx[inst] = true
+			pcall(function() inst.Enabled = false end)
+		end
+	end
+	local function disableLightFx(inst)
+		if saved.light[inst] == nil and inst.Enabled then
+			saved.light[inst] = true
+			pcall(function() inst.Enabled = false end)
+		end
+	end
+
+	local function applyBoost()
+		-- gorsel efektleri kapat (parcacik, trail, beam, duman, ates, pulcuk)
+		for _, inst in ipairs(workspace:GetDescendants()) do
+			if FX_CLASSES[inst.ClassName] then disableFx(inst) end
+		end
+		-- Lighting son-islem efektlerini kapat (bloom, sun rays, renk duzeltme, derinlik, bulaniklik)
+		for _, inst in ipairs(Lighting:GetChildren()) do
+			if LIGHT_FX[inst.ClassName] then disableLightFx(inst) end
+		end
+		-- golgeleri kapat
+		saved.shadows = Lighting.GlobalShadows
+		pcall(function() Lighting.GlobalShadows = false end)
+		-- render kalitesini dusur (FPS'i en cok etkileyen ayar)
+		pcall(function()
+			local gs = UserSettings():GetService("UserGameSettings")
+			saved.quality = gs.SavedQualityLevel
+			gs.SavedQualityLevel = Enum.SavedQualitySetting.QualityLevel1
+		end)
+	end
+
+	local function revertBoost()
+		for inst in pairs(saved.fx) do
+			if inst and inst.Parent then pcall(function() inst.Enabled = true end) end
+		end
+		for inst in pairs(saved.light) do
+			if inst and inst.Parent then pcall(function() inst.Enabled = true end) end
+		end
+		if saved.shadows ~= nil then pcall(function() Lighting.GlobalShadows = saved.shadows end) end
+		if saved.quality then
+			pcall(function() UserSettings():GetService("UserGameSettings").SavedQualityLevel = saved.quality end)
+		end
+		saved = { fx = {}, light = {}, quality = nil, shadows = nil }
+	end
+
+	-- booster acikken sonradan eklenen efektleri de (patlama, buyu vb.) yakalayip kapatir
+	workspace.DescendantAdded:Connect(function(inst)
+		if not active then return end
+		task.defer(function()
+			if active and FX_CLASSES[inst.ClassName] then disableFx(inst) end
+		end)
+	end)
+	Lighting.ChildAdded:Connect(function(inst)
+		if not active then return end
+		task.defer(function()
+			if active and LIGHT_FX[inst.ClassName] then disableLightFx(inst) end
+		end)
+	end)
+	gui.Destroying:Connect(function() if active then revertBoost() end end)
+
+	sv3:AddLabel("Lowers render quality and disables background effects (particles, trails, post-processing, shadows) to raise FPS.")
+	sv3:AddToggle("FPS Booster", false, function(on)
+		active = on
+		if on then
+			applyBoost()
+			Aurora:Notify("FPS Booster", "Enabled: effects reduced, render quality lowered.", 3, "success")
+		else
+			revertBoost()
+			Aurora:Notify("FPS Booster", "Disabled: everything restored.", 2.5)
+		end
 	end)
 end
 
