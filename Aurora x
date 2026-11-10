@@ -1761,6 +1761,7 @@ local ESP = {
 	HeldItem = false,
 	Inventory = false,
 	InvMax = 4,
+	InvScale = 100,
 	TeamColor = false,
 	VisColor = false,
 	Rainbow = false,
@@ -1953,6 +1954,7 @@ function INV.scan(model, player)
 end
 
 function INV.draw(d, g, x, y, ts, far, c)
+	ts = math.max(7, math.floor(ts * ESP.InvScale / 100 + .5))
 	local ih = ts + 3
 	local tagW = math.floor(ts * 3.6)
 	local tr = Lang == 'tr'
@@ -3368,6 +3370,7 @@ local eInv = ESPTab:AddSection("Inventory & Held Item")
 eInv:AddToggle("Held Item", false, function(on) ESP.HeldItem = on end)
 eInv:AddToggle("Inventory", false, function(on) ESP.Inventory = on end)
 eInv:AddSlider("Max Items", 1, 8, 4, function(v) ESP.InvMax = math.floor(v) end)
+eInv:AddSlider("Card Size (%)", 50, 200, 100, function(v) ESP.InvScale = math.floor(v) end)
 
 local e4 = ESPTab:AddSection("NPC ESP")
 e4:AddToggle("NPC Enabled", false, function(on)
