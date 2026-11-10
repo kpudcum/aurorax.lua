@@ -2955,6 +2955,120 @@ do
 	sv1:AddButton("Server Hop (en bos sunucu)", function() hop(true) end)
 end
 
+local sv1b = ServerTab:AddSection("Safezone")
+do
+	local SZ = { Height = 900, Built = false, CF = nil, Back = nil, Active = false }
+	local platform, dome, glow = nil, nil, nil
+	local function say(msg, kind) Aurora:Notify("Safezone", msg, 3, kind or "success") end
+
+	local function rootOf(plr)
+		local c = plr and plr.Character
+		return c and c:FindFirstChild("HumanoidRootPart")
+	end
+
+	-- Platform + cevresinde hafif parlayan "guc alani" kabugu: tamamen bu istemciye ozel,
+	-- bu yuzden baska hicbir oyuncu goremez ya da fiziksel olarak dokunamaz.
+	local function buildPlatform(cf)
+		local model = Instance.new("Model")
+		model.Name = "AuroraSafezone"
+
+		local base = Instance.new("Part")
+		base.Name = "Platform"
+		base.Shape = Enum.PartType.Cylinder
+		base.Size = Vector3.new(2, 28, 28)
+		base.CFrame = cf * CFrame.Angles(0, 0, math.rad(90))
+		base.Anchored = true
+		base.CanCollide = true
+		base.Material = Enum.Material.Glass
+		base.Color = T.bg0
+		base.Parent = model
+		onThemeChange(function(k, c2) if k == "bg0" then base.Color = c2 end end)
+
+		local ring = Instance.new("Part")
+		ring.Name = "Ring"
+		ring.Shape = Enum.PartType.Cylinder
+		ring.Size = Vector3.new(0.6, 29, 29)
+		ring.CFrame = base.CFrame
+		ring.Anchored = true
+		ring.CanCollide = false
+		ring.Material = Enum.Material.Neon
+		ring.Color = accent
+		ring.Transparency = 0.1
+		ring.Parent = model
+		onAccent(function(a) ring.Color = a end)
+
+		local light = Instance.new("PointLight")
+		light.Color = accent
+		light.Range = 26
+		light.Brightness = 2.2
+		light.Parent = base
+		onAccent(function(a) light.Color = a end)
+
+		local shield = Instance.new("Part")
+		shield.Name = "Shield"
+		shield.Shape = Enum.PartType.Ball
+		shield.Size = Vector3.new(46, 46, 46)
+		shield.CFrame = cf
+		shield.Anchored = true
+		shield.CanCollide = false
+		shield.CanQuery = false
+		shield.Material = Enum.Material.ForceField
+		shield.Transparency = 0.85
+		shield.Color = accent
+		shield.Parent = model
+		onAccent(function(a) shield.Color = a end)
+
+		model.Parent = workspace
+		platform, dome, glow = base, shield, ring
+		return model
+	end
+
+	local function clearPlatform()
+		if platform and platform.Parent then platform.Parent:Destroy() end
+		platform, dome, glow = nil, nil, nil
+	end
+	gui.Destroying:Connect(clearPlatform)
+
+	sv1b:AddLabel("Creates one fixed spot high above the map and teleports you there. Out of normal players' reach.")
+	sv1b:AddSlider("Safezone Height", 500, 1500, SZ.Height, function(v) SZ.Height = v end, 50)
+
+	sv1b:AddButton("Go to Safezone", function()
+		local r = rootOf(lp)
+		if not r then say("Character not found", "error") return end
+		if not SZ.Built then
+			-- konum sadece ilk seferde belirlenir ve sabit kalir: "tek bir yer"
+			SZ.CF = CFrame.new(r.Position + Vector3.new(0, SZ.Height, 0))
+			buildPlatform(SZ.CF)
+			SZ.Built = true
+		end
+		SZ.Back = r.CFrame
+		SZ.Active = true
+		pcall(function() r.AssemblyLinearVelocity = Vector3.new(0, 0, 0) end)
+		r.CFrame = SZ.CF + Vector3.new(0, 4, 0)
+		say("Teleported to the safezone")
+	end)
+
+	sv1b:AddButton("Rebuild Here", function()
+		local r = rootOf(lp)
+		if not r then say("Character not found", "error") return end
+		clearPlatform()
+		SZ.CF = CFrame.new(r.Position + Vector3.new(0, SZ.Height, 0))
+		buildPlatform(SZ.CF)
+		SZ.Built = true
+		say("Safezone moved to a new spot above your current position", "warn")
+	end)
+
+	sv1b:AddButton("Return", function()
+		if not SZ.Active or not SZ.Back then say("You have not used the safezone yet", "warn") return end
+		local r = rootOf(lp)
+		if not r then say("Character not found", "error") return end
+		pcall(function() r.AssemblyLinearVelocity = Vector3.new(0, 0, 0) end)
+		r.CFrame = SZ.Back
+		SZ.Active = false
+		say("Teleported back")
+	end)
+end
+
 local sv2 = ServerTab:AddSection("Utility")
 do
 	local VirtualUser = game:GetService("VirtualUser")
