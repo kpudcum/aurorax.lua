@@ -641,51 +641,59 @@ function Aurora:CreateWindow(titleText, subtitle)
 				new("UICorner", { CornerRadius = UDim.new(0, r) }).Parent = f
 			end
 		end
-		local function rect(x, y, w, h, r, rot) -- dolu parca
-			local f = new("Frame", { Position = UDim2.fromOffset(x, y), Size = UDim2.fromOffset(w, h), BackgroundColor3 = T.dim, BorderSizePixel = 0, Rotation = rot or 0 })
+		local function rect(x, y, w, h, r, rot, alpha) -- dolu parca (alpha: yari saydam ikinci ton)
+			local f = new("Frame", { Position = UDim2.fromOffset(x, y), Size = UDim2.fromOffset(w, h), BackgroundColor3 = T.dim, BackgroundTransparency = alpha or 0, BorderSizePixel = 0, Rotation = rot or 0 })
 			round(f, r)
 			f.Parent = box
 			table.insert(fills, f)
 		end
-		local function ring(x, y, w, h, r, thick) -- cizgi (ici bos) parca
+		local function ring(x, y, w, h, r, thick, alpha) -- cizgi (ici bos) parca
 			local f = new("Frame", { Position = UDim2.fromOffset(x, y), Size = UDim2.fromOffset(w, h), BackgroundTransparency = 1, BorderSizePixel = 0 })
 			round(f, r)
-			local st = new("UIStroke", { Thickness = thick or 1.6, Color = T.dim, ApplyStrokeMode = Enum.ApplyStrokeMode.Border })
+			local st = new("UIStroke", { Thickness = thick or 1.6, Color = T.dim, Transparency = alpha or 0, ApplyStrokeMode = Enum.ApplyStrokeMode.Border })
 			st.Parent = f
 			f.Parent = box
 			table.insert(strokes, st)
 		end
 
 		if kind == "home" then
-			rect(4, 10, 12, 8, 2)
-			rect(4, 2, 12, 12, 2, 45)
+			rect(3, 9, 14, 9, 3, 0, 0.55)
+			rect(5, 2.5, 10, 10, 2, 45)
+			rect(8, 12, 4, 6, 1.5)
 		elseif kind == "player" then
-			rect(6, 1, 8, 8, "c")
-			rect(3, 11, 14, 8, 4)
+			rect(6.5, 1, 7, 7, "c")
+			rect(3, 11, 14, 8, 4, 0, 0.55)
+			ring(3, 11, 14, 8, 4, 1.4)
 		elseif kind == "visuals" then
-			ring(2, 5, 16, 10, 5, 1.6)
-			rect(7, 7, 6, 6, "c")
+			ring(1, 4, 18, 12, 6, 1.6)
+			ring(6.5, 6.5, 7, 7, "c", 1.4, 0.45)
+			rect(8.5, 8.5, 3, 3, "c")
 		elseif kind == "esp" then
-			rect(2, 2, 6, 2) rect(2, 2, 2, 6)
-			rect(12, 2, 6, 2) rect(16, 2, 2, 6)
-			rect(2, 16, 6, 2) rect(2, 12, 2, 6)
-			rect(12, 16, 6, 2) rect(16, 12, 2, 6)
-			rect(8, 8, 4, 4, "c")
+			rect(1, 1, 6, 2, 1) rect(1, 1, 2, 6, 1)
+			rect(13, 1, 6, 2, 1) rect(17, 1, 2, 6, 1)
+			rect(1, 17, 6, 2, 1) rect(1, 13, 2, 6, 1)
+			rect(13, 17, 6, 2, 1) rect(17, 13, 2, 6, 1)
+			ring(6, 6, 8, 8, "c", 1.4, 0.5)
+			rect(9, 9, 2, 2, "c")
 		elseif kind == "aimbot" then
 			ring(3, 3, 14, 14, "c", 1.6)
-			rect(9, 0, 2, 5) rect(9, 15, 2, 5)
-			rect(0, 9, 5, 2) rect(15, 9, 5, 2)
-			rect(8, 8, 4, 4, "c")
+			ring(6.5, 6.5, 7, 7, "c", 1.2, 0.5)
+			rect(9.2, 0, 1.6, 4, 1) rect(9.2, 16, 1.6, 4, 1)
+			rect(0, 9.2, 4, 1.6, 1) rect(16, 9.2, 4, 1.6, 1)
+			rect(9, 9, 2, 2, "c")
 		elseif kind == "hitbox" then
-			ring(2, 7, 10, 10, 2, 1.6)
-			ring(8, 2, 10, 10, 2, 1.6)
+			ring(7, 1.5, 11, 11, 2.5, 1.4, 0.5)
+			rect(2, 7.5, 11, 11, 2.5, 0, 0.8)
+			ring(2, 7.5, 11, 11, 2.5, 1.7)
 		elseif kind == "teleport" then
-			ring(5, 1, 10, 18, "c", 1.6)
-			ring(8, 5, 4, 10, "c", 1.4)
+			ring(4, 1, 12, 18, "c", 1.6)
+			ring(7, 5, 6, 10, "c", 1.3, 0.5)
+			rect(9, 9, 2, 2, "c")
+			rect(0, 9, 3, 2, 1)
+			rect(17, 9, 3, 2, 1, 0, 0.5)
 		elseif kind == "settings" then
-			rect(2, 4, 7, 2, 1) rect(11, 2, 6, 6, "c")
-			rect(12, 9, 6, 2, 1) rect(4, 7, 6, 6, "c")
-			rect(2, 14, 8, 2, 1) rect(12, 12, 6, 6, "c")
+			rect(2, 3, 16, 2, 1, 0, 0.55) rect(2, 9, 16, 2, 1, 0, 0.55) rect(2, 15, 16, 2, 1, 0, 0.55)
+			rect(10, 1, 6, 6, "c") rect(4, 7, 6, 6, "c") rect(11, 13, 6, 6, "c")
 		end
 
 		box.Parent = parent
@@ -2733,6 +2741,72 @@ do
 			end
 		end)
 	end)
+end
+
+local p4 = Player:AddSection("Server")
+do
+	local TeleportService = game:GetService("TeleportService")
+	local HttpService = game:GetService("HttpService")
+	local busy = false
+	local function say(msg, kind) Aurora:Notify("Server", msg, 3, kind or "success") end
+
+	local function httpGet(url)
+		local ok, body = pcall(function() return game:HttpGet(url) end)
+		if ok and type(body) == "string" and #body > 2 then return body end
+		local req = (syn and syn.request) or http_request or request or (http and http.request) or (fluxus and fluxus.request)
+		if req then
+			local ok2, res = pcall(function() return req({ Url = url, Method = "GET" }) end)
+			if ok2 and res and res.Body then return res.Body end
+		end
+		return nil
+	end
+
+	p4:AddButton("Rejoin", function()
+		if busy then return end
+		busy = true
+		say("Ayni sunucuya yeniden baglaniliyor...", "warn")
+		local ok = pcall(function()
+			if #Players:GetPlayers() <= 1 then
+				TeleportService:Teleport(game.PlaceId, lp)
+			else
+				TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, lp)
+			end
+		end)
+		if not ok then say("Rejoin basarisiz", "error") end
+		task.delay(6, function() busy = false end)
+	end)
+
+	local function hop(smallest)
+		if busy then return end
+		busy = true
+		task.spawn(function()
+			say(smallest and "En bos sunucu araniyor..." or "Yeni sunucu araniyor...", "warn")
+			local url = string.format("https://games.roblox.com/v1/games/%d/servers/Public?sortOrder=%s&limit=100", game.PlaceId, smallest and "Asc" or "Desc")
+			local body = httpGet(url)
+			local found = {}
+			if body then
+				local okJ, data = pcall(function() return HttpService:JSONDecode(body) end)
+				if okJ and type(data) == "table" and type(data.data) == "table" then
+					for _, sv in ipairs(data.data) do
+						if sv.id ~= game.JobId and sv.playing and sv.maxPlayers and sv.playing < sv.maxPlayers - 1 then table.insert(found, sv) end
+					end
+				end
+			end
+			local ok
+			if #found > 0 then
+				local pick = smallest and found[1] or found[math.random(1, #found)]
+				ok = pcall(function() TeleportService:TeleportToPlaceInstance(game.PlaceId, pick.id, lp) end)
+				if ok then say("Sunucuya geciliyor (" .. tostring(pick.playing) .. " oyuncu)") end
+			else
+				ok = pcall(function() TeleportService:Teleport(game.PlaceId, lp) end)
+				if ok then say("Sunucu listesi alinamadi, rastgele sunucuya geciliyor", "warn") end
+			end
+			if not ok then say("Server hop basarisiz", "error") end
+			task.delay(6, function() busy = false end)
+		end)
+	end
+	p4:AddButton("Server Hop (rastgele)", function() hop(false) end)
+	p4:AddButton("Server Hop (en bos sunucu)", function() hop(true) end)
 end
 
 -- 3. VISUALS SEKME
