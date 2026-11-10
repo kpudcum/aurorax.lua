@@ -285,12 +285,10 @@ function Aurora:Notify(title, body, duration, kind)
 	onThemeChange(function(k, c) if k == "card" then card.BackgroundColor3 = c end end)
 	local edge = stroke(T.line)
 	edge.Parent = card
-	if col then edge.Color = col else onAccent(function(a) edge.Color = a end) end
 	edge.Transparency = 0.35
 
 	local head = new("Frame", { Size = UDim2.new(1, 0, 0, 34), BackgroundTransparency = 1, LayoutOrder = 1 })
 	local ic = new("Frame", { Size = UDim2.fromOffset(34, 34), BackgroundColor3 = col or accent, BorderSizePixel = 0 }, { corner(10) })
-	if not col then onAccent(function(a) ic.BackgroundColor3 = a end) end
 	ic.Parent = head
 	label({ Text = glyph, Font = Enum.Font.GothamBlack, TextSize = 16, TextColor3 = Color3.new(1, 1, 1), TextXAlignment = Enum.TextXAlignment.Center, Size = UDim2.fromScale(1, 1) }).Parent = ic
 	label({ Text = title, Font = Enum.Font.GothamBold, TextSize = 13, Size = UDim2.new(1, -46, 0, 16), Position = UDim2.fromOffset(46, 1) }).Parent = head
@@ -300,17 +298,29 @@ function Aurora:Notify(title, body, duration, kind)
 	local track = new("Frame", { Size = UDim2.new(1, 0, 0, 3), BackgroundColor3 = T.row2, BorderSizePixel = 0, LayoutOrder = 2 }, { corner(2) })
 	onThemeChange(function(k, c) if k == "row2" then track.BackgroundColor3 = c end end)
 	local bar = new("Frame", { Size = UDim2.fromScale(1, 1), BackgroundColor3 = col or accent, BorderSizePixel = 0 }, { corner(2) })
-	if not col then onAccent(function(a) bar.BackgroundColor3 = a end) end
 	bar.Parent = track
 	track.Parent = card
+
+	-- rainbow aciksa bildirim rengi (cerceve, ikon, sure cubugu) de gokkusagi renginde akar; kapaliysa turune gore sabit renk
+	local function paint(a)
+		local c = (isRainbowAccent or not col) and a or col
+		edge.Color = c; ic.BackgroundColor3 = c; bar.BackgroundColor3 = c
+	end
+	paint(accent)
+	table.insert(hooks, paint)
+	local function unhook()
+		local ix = table.find(hooks, paint)
+		if ix then table.remove(hooks, ix) end
+	end
 
 	card.Parent = holder
 	holder.Parent = notifHolder
 	tween(card, 0.45, { Position = UDim2.new(0, 0, 0, 0) }, Enum.EasingStyle.Back)
 	tween(bar, duration, { Size = UDim2.new(0, 0, 1, 0) }, Enum.EasingStyle.Linear)
 	task.delay(duration, function()
-		if not card.Parent then return end
+		if not card.Parent then unhook() return end
 		tween(card, 0.35, { Position = UDim2.new(1.3, 0, 0, 0) }, Enum.EasingStyle.Quad, Enum.EasingDirection.In).Completed:Wait()
+		unhook()
 		holder:Destroy()
 	end)
 end
@@ -852,10 +862,38 @@ function Aurora:CreateWindow(titleText, subtitle)
 			local content = new("Frame", { Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1, LayoutOrder = 1 }, { pad(10, 0, 10, 10), list(6) })
 			content.Parent = card
 			card.Parent = scroll
-			if collapsed then content.Visible = false arrow.Rotation = -90 end
+			-- kategori acma/kapama: yukseklik yavasca kayarak degisir (kapaliyken icerik kirpilir)
+			local clist = content:FindFirstChildOfClass("UIListLayout")
+			local isOpen = not collapsed
+			local anim = 0
+			local function fullH() return clist.AbsoluteContentSize.Y + 10 end
+			if collapsed then
+				content.AutomaticSize = Enum.AutomaticSize.None
+				content.Size = UDim2.new(1, 0, 0, 0)
+				content.ClipsDescendants = true
+				arrow.Rotation = -90
+			end
 			head.MouseButton1Click:Connect(function()
-				content.Visible = not content.Visible
-				tween(arrow, 0.2, { Rotation = content.Visible and 0 or -90 })
+				isOpen = not isOpen
+				anim = anim + 1
+				local my = anim
+				tween(arrow, 0.28, { Rotation = isOpen and 0 or -90 })
+				content.ClipsDescendants = true
+				if isOpen then
+					content.AutomaticSize = Enum.AutomaticSize.None
+					tween(content, 0.32, { Size = UDim2.new(1, 0, 0, fullH()) }, Enum.EasingStyle.Quint)
+					task.delay(0.36, function()
+						if my == anim and isOpen then
+							content.AutomaticSize = Enum.AutomaticSize.Y
+							content.Size = UDim2.new(1, 0, 0, 0)
+							content.ClipsDescendants = false
+						end
+					end)
+				else
+					content.AutomaticSize = Enum.AutomaticSize.None
+					content.Size = UDim2.new(1, 0, 0, fullH())
+					tween(content, 0.32, { Size = UDim2.new(1, 0, 0, 0) }, Enum.EasingStyle.Quint)
+				end
 			end)
 
 			local Section = {}
