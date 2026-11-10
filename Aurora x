@@ -1,4 +1,3 @@
-
 --[[
   AURORA X - ULTIMATE INTEGRATED SCRIPT (Mobile Optimized Edition)
   - Mobil cihazlar icin ekran olceklendirmesi ve baslangic boyutu optimize edildi.
@@ -1510,7 +1509,8 @@ end)
 ------------------------------------------------------------------ CUSTOM SKY
 local SkyAPI = (function()
 	local function C(r, g, b) return Color3.fromRGB(r, g, b) end
-	local SKY = { Name = "Default", Cur = nil, Particles = true, Density = 1, useTime = true, over = {} }
+	local SKY = { Name = "Default", Cur = nil, Particles = true, Density = 1, useTime = true, Detail = true, over = {} }
+	local nebPart, cloudOrig = nil, nil
 	local orig = nil
 	local hidden = {}
 	local fxPart, fxEm = nil, nil
@@ -1570,6 +1570,24 @@ local SkyAPI = (function()
 			bloom = { 0.5, 24, 1.8 }, rays = 0.1, stars = 0,
 			fx = { rate = 30, c1 = C(235, 200, 150), c2 = C(215, 175, 120), size = 0.4, speed = 9, life = 5, acc = Vector3.new(8, 0, 0), light = 0, tr = 0.4, spread = 20, up = false } },
 	}
+
+	-- Her gokyuzu icin: bulut (Clouds), gokyuzu yildiz/nebula katmani (buyuk parcacik dokusu), gunes/ay boyutu
+	local DETAIL = {
+		Space = { cover = 0, den = 0, col = C(255, 255, 255), c1 = C(110, 60, 255), c2 = C(255, 70, 200), rate = 0.7, size = 380, tr = 0.86, light = 1, h = 650, moon = 28 },
+		Galaxy = { cover = 0, den = 0, col = C(255, 255, 255), c1 = C(255, 70, 200), c2 = C(80, 120, 255), rate = 0.9, size = 420, tr = 0.82, light = 1, h = 650, moon = 35 },
+		Sakura = { cover = 0.45, den = 0.5, col = C(255, 205, 220), c1 = C(255, 190, 215), c2 = C(255, 230, 240), rate = 0.5, size = 300, tr = 0.9, light = 0.3, h = 550, sun = 30 },
+		Snow = { cover = 0.9, den = 0.85, col = C(215, 225, 240), c1 = C(235, 240, 250), c2 = C(200, 210, 225), rate = 0.6, size = 340, tr = 0.88, light = 0.1, h = 550, sun = 14 },
+		Sunset = { cover = 0.6, den = 0.7, col = C(255, 160, 110), c1 = C(255, 140, 80), c2 = C(255, 90, 140), rate = 0.6, size = 360, tr = 0.86, light = 0.6, h = 450, sun = 40 },
+		Dawn = { cover = 0.5, den = 0.6, col = C(255, 205, 200), c1 = C(255, 200, 170), c2 = C(200, 170, 230), rate = 0.5, size = 330, tr = 0.88, light = 0.5, h = 500, sun = 32 },
+		Midnight = { cover = 0.35, den = 0.5, col = C(70, 85, 140), c1 = C(60, 80, 170), c2 = C(30, 40, 100), rate = 0.5, size = 340, tr = 0.88, light = 0.8, h = 600, moon = 24 },
+		Neon = { cover = 0.3, den = 0.6, col = C(255, 80, 220), c1 = C(255, 60, 220), c2 = C(60, 230, 255), rate = 1, size = 360, tr = 0.8, light = 1, h = 600, moon = 18 },
+		BloodMoon = { cover = 0.5, den = 0.8, col = C(120, 20, 25), c1 = C(200, 30, 30), c2 = C(90, 10, 20), rate = 0.6, size = 360, tr = 0.84, light = 0.9, h = 600, moon = 48 },
+		Toxic = { cover = 0.7, den = 0.8, col = C(120, 190, 50), c1 = C(150, 255, 70), c2 = C(70, 150, 30), rate = 0.7, size = 340, tr = 0.86, light = 0.7, h = 500, sun = 18 },
+		Aurora = { cover = 0.15, den = 0.3, col = C(150, 230, 200), c1 = C(70, 255, 190), c2 = C(150, 110, 255), rate = 1.1, size = 300, tr = 0.78, light = 1, h = 520, moon = 14 },
+		Mist = { cover = 1, den = 1, col = C(170, 185, 175), c1 = C(190, 200, 195), c2 = C(150, 165, 158), rate = 0.6, size = 400, tr = 0.86, light = 0.2, h = 450, sun = 10 },
+		Volcano = { cover = 0.85, den = 0.9, col = C(60, 35, 30), c1 = C(255, 90, 30), c2 = C(70, 40, 35), rate = 0.7, size = 380, tr = 0.84, light = 0.6, h = 500, sun = 25 },
+		Desert = { cover = 0.25, den = 0.4, col = C(255, 235, 195), c1 = C(245, 215, 160), c2 = C(230, 190, 130), rate = 0.35, size = 300, tr = 0.92, light = 0.2, h = 600, sun = 34 },
+	}
 	local ORDER = { "Default", "Space", "Galaxy", "Sakura", "Snow", "Sunset", "Dawn", "Midnight", "Neon", "BloodMoon", "Toxic", "Aurora", "Mist", "Volcano", "Desert" }
 
 	local function save()
@@ -1595,6 +1613,80 @@ local SkyAPI = (function()
 				o.Parent = nil
 			end
 		end
+	end
+
+	local function cloudsOf(create)
+		local terrain = workspace:FindFirstChildOfClass("Terrain")
+		if not terrain then return nil end
+		local cl = terrain:FindFirstChildOfClass("Clouds")
+		if not cl and create then
+			cl = Instance.new("Clouds")
+			cl.Name = "AuroraSky_Clouds"
+			cl.Parent = terrain
+		end
+		return cl
+	end
+	local function unClouds()
+		local cl = cloudsOf(false)
+		if not cl then cloudOrig = nil return end
+		if cl.Name == "AuroraSky_Clouds" then
+			cl:Destroy()
+		elseif cloudOrig and cloudOrig[1] == cl then
+			pcall(function()
+				cl.Cover, cl.Density, cl.Color, cl.Enabled = cloudOrig[2], cloudOrig[3], cloudOrig[4], cloudOrig[5]
+			end)
+		end
+		cloudOrig = nil
+	end
+	local function applyClouds(dt)
+		if not SKY.Detail or not dt then return end
+		local cl = cloudsOf(true)
+		if not cl then return end
+		if cl.Name ~= "AuroraSky_Clouds" and not cloudOrig then
+			cloudOrig = { cl, cl.Cover, cl.Density, cl.Color, cl.Enabled }
+		end
+		cl.Enabled = true
+		cl.Cover = SKY.over.cover or dt.cover
+		cl.Density = dt.den
+		cl.Color = dt.col
+	end
+
+	local function nebClear()
+		if nebPart then nebPart:Destroy() end
+		nebPart = nil
+	end
+	local function nebBuild(dt)
+		nebClear()
+		if not dt or not SKY.Detail then return end
+		local part = Instance.new("Part")
+		part.Name = "AuroraSkyNebula"
+		part.Anchored = true
+		part.CanCollide = false
+		part.CanQuery = false
+		part.CanTouch = false
+		part.CastShadow = false
+		part.Transparency = 1
+		part.Size = Vector3.new(1900, 500, 1900)
+		local em = Instance.new("ParticleEmitter")
+		em.Texture = "rbxasset://textures/particles/smoke_main.dds"
+		em.Color = ColorSequence.new(dt.c1, dt.c2)
+		em.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, dt.size, dt.size * 0.45), NumberSequenceKeypoint.new(1, dt.size, dt.size * 0.45) })
+		em.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(0.25, dt.tr), NumberSequenceKeypoint.new(0.75, dt.tr), NumberSequenceKeypoint.new(1, 1) })
+		em.Lifetime = NumberRange.new(40, 70)
+		em.Speed = NumberRange.new(0, 0.4)
+		em.Rate = dt.rate
+		em.Rotation = NumberRange.new(0, 360)
+		em.RotSpeed = NumberRange.new(-1, 1)
+		em.LightEmission = dt.light
+		em.LightInfluence = 0
+		em.LockedToPart = true
+		em.Shape = Enum.ParticleEmitterShape.Box
+		em.ShapeStyle = Enum.ParticleEmitterShapeStyle.Volume
+		em.Parent = part
+		part:SetAttribute("h", dt.h)
+		part.Parent = workspace.CurrentCamera
+		nebPart = part
+		pcall(function() em:Emit(math.floor(dt.rate * 45)) end)
 	end
 
 	local function applyLight(p)
@@ -1623,6 +1715,12 @@ local SkyAPI = (function()
 		sk:SetAttribute("blank", p.blank and true or false)
 		sk.StarCount = SKY.over.stars or p.stars or 0
 		sk.CelestialBodiesShown = true
+		local dt = DETAIL[SKY.Name]
+		pcall(function()
+			sk.SunAngularSize = dt and dt.sun or 21
+			sk.MoonAngularSize = dt and dt.moon or 11
+		end)
+		pcall(applyClouds, dt)
 		if p.blank then
 			sk.SkyboxBk = "" sk.SkyboxDn = "" sk.SkyboxFt = "" sk.SkyboxLf = "" sk.SkyboxRt = "" sk.SkyboxUp = ""
 		end
@@ -1671,6 +1769,8 @@ local SkyAPI = (function()
 		SKY.Name = "Default"
 		SKY.over = {}
 		fxClear()
+		nebClear()
+		unClouds()
 		for _, n in ipairs({ "AuroraSky_Atmo", "AuroraSky_CC", "AuroraSky_Bloom", "AuroraSky_Rays", "AuroraSky_Sky" }) do
 			local o = Lighting:FindFirstChild(n)
 			if o then o:Destroy() end
@@ -1707,6 +1807,7 @@ local SkyAPI = (function()
 		SKY.Name = name
 		applyLight(p)
 		fxBuild(p)
+		nebBuild(DETAIL[name])
 	end
 
 	-- oyun ayarlari ezmesin diye ayarlari yarim saniyede bir tekrar uygula; parcaciklar kamerayi takip eder
@@ -1716,6 +1817,13 @@ local SkyAPI = (function()
 		if acc >= 0.5 then
 			acc = 0
 			pcall(applyLight, SKY.Cur)
+		end
+		if nebPart then
+			local cam = workspace.CurrentCamera
+			if cam then
+				if nebPart.Parent ~= cam then nebPart.Parent = cam end
+				nebPart.CFrame = CFrame.new(cam.CFrame.Position + Vector3.new(0, nebPart:GetAttribute("h") or 600, 0))
+			end
 		end
 		if fxPart then
 			local cam = workspace.CurrentCamera
@@ -1740,6 +1848,18 @@ local SkyAPI = (function()
 		SetTime = function(on)
 			SKY.useTime = on
 			if SKY.Cur then pcall(applyLight, SKY.Cur) end
+		end,
+		SetDetail = function(on)
+			SKY.Detail = on
+			if SKY.Cur then
+				if on then
+					pcall(nebBuild, DETAIL[SKY.Name])
+					pcall(applyClouds, DETAIL[SKY.Name])
+				else
+					nebClear()
+					unClouds()
+				end
+			end
 		end,
 		SetParticles = function(on)
 			SKY.Particles = on
@@ -3070,150 +3190,6 @@ do
 	end)
 end
 
-local sv3 = ServerTab:AddSection("RTX Mode")
-do
-	local active = false
-	local intensity = 60
-	local saved = nil
-	local fxs = {}
-
-	local function setProp(obj, prop, val)
-		local ok = pcall(function() obj[prop] = val end)
-		if not ok and sethiddenproperty then pcall(sethiddenproperty, obj, prop, val) end
-	end
-
-	local function getFx(class, name)
-		local inst = fxs[name]
-		if inst and inst.Parent then return inst end
-		inst = Instance.new(class)
-		inst.Name = name
-		inst.Parent = Lighting
-		fxs[name] = inst
-		return inst
-	end
-
-	-- yogunluga gore tum gercekci ayarlari uygular
-	local function style()
-		local k = math.clamp(intensity / 100, 0, 1)
-		pcall(function()
-			Lighting.GlobalShadows = true
-			Lighting.ShadowSoftness = 0.12
-			Lighting.Brightness = 2 + k * 0.8
-			Lighting.ExposureCompensation = 0.15 * k
-			Lighting.EnvironmentDiffuseScale = 1
-			Lighting.EnvironmentSpecularScale = 1
-		end)
-		pcall(function()
-			local b = getFx("BloomEffect", "KPUD_RTX_Bloom")
-			b.Intensity = 0.15 + 0.5 * k; b.Size = 28; b.Threshold = 0.9; b.Enabled = true
-			local s = getFx("SunRaysEffect", "KPUD_RTX_Rays")
-			s.Intensity = 0.04 + 0.16 * k; s.Spread = 0.75; s.Enabled = true
-			local c = getFx("ColorCorrectionEffect", "KPUD_RTX_Color")
-			c.Contrast = 0.05 + 0.12 * k; c.Saturation = 0.08 + 0.2 * k; c.Brightness = 0
-			c.TintColor = Color3.fromRGB(255, 249, 240); c.Enabled = true
-			local d = getFx("DepthOfFieldEffect", "KPUD_RTX_DoF")
-			d.FarIntensity = 0.1 + 0.2 * k; d.NearIntensity = 0; d.FocusDistance = 55; d.InFocusRadius = 55; d.Enabled = true
-		end)
-		pcall(function()
-			local atm = Lighting:FindFirstChildOfClass("Atmosphere")
-			if atm then
-				if not saved.atm then
-					saved.atm = { inst = atm, density = atm.Density, offset = atm.Offset, glare = atm.Glare, haze = atm.Haze }
-				end
-				atm.Density = 0.28 + 0.1 * k; atm.Offset = 0.25; atm.Glare = 0.25 * k; atm.Haze = 0.9
-			else
-				local a = getFx("Atmosphere", "KPUD_RTX_Atmos")
-				a.Density = 0.28 + 0.1 * k; a.Offset = 0.25; a.Glare = 0.25 * k; a.Haze = 0.9
-				a.Color = Color3.fromRGB(200, 210, 225); a.Decay = Color3.fromRGB(106, 112, 125)
-			end
-		end)
-	end
-
-	local function applyRTX()
-		saved = {}
-		pcall(function()
-			saved.tech, saved.shadows, saved.bright, saved.expo = Lighting.Technology, Lighting.GlobalShadows, Lighting.Brightness, Lighting.ExposureCompensation
-			saved.soft, saved.diff, saved.spec = Lighting.ShadowSoftness, Lighting.EnvironmentDiffuseScale, Lighting.EnvironmentSpecularScale
-		end)
-		-- en gercekci isik teknolojisi (gizli ozellik, executor destegi gerekir)
-		setProp(Lighting, "Technology", Enum.Technology.Future)
-		local terrain = workspace:FindFirstChildOfClass("Terrain")
-		if terrain then
-			pcall(function()
-				saved.water = { refl = terrain.WaterReflectance, wave = terrain.WaterWaveSize, trans = terrain.WaterTransparency }
-				terrain.WaterReflectance = 1
-				terrain.WaterWaveSize = 0.3
-				terrain.WaterTransparency = 0.85
-			end)
-		end
-		pcall(function()
-			saved.rq = settings().Rendering.QualityLevel
-			settings().Rendering.QualityLevel = Enum.QualityLevel.Level21
-		end)
-		pcall(function()
-			local gs = UserSettings():GetService("UserGameSettings")
-			saved.quality = gs.SavedQualityLevel
-			gs.SavedQualityLevel = Enum.SavedQualitySetting.QualityLevel10
-		end)
-		style()
-	end
-
-	local function revertRTX()
-		for name, inst in pairs(fxs) do
-			pcall(function() inst:Destroy() end)
-			fxs[name] = nil
-		end
-		local s = saved
-		saved = nil
-		if not s then return end
-		pcall(function()
-			if s.shadows ~= nil then Lighting.GlobalShadows = s.shadows end
-			if s.bright then Lighting.Brightness = s.bright end
-			if s.expo then Lighting.ExposureCompensation = s.expo end
-			if s.soft then Lighting.ShadowSoftness = s.soft end
-			if s.diff then Lighting.EnvironmentDiffuseScale = s.diff end
-			if s.spec then Lighting.EnvironmentSpecularScale = s.spec end
-		end)
-		if s.tech then setProp(Lighting, "Technology", s.tech) end
-		if s.atm then
-			local a = s.atm
-			pcall(function() a.inst.Density, a.inst.Offset, a.inst.Glare, a.inst.Haze = a.density, a.offset, a.glare, a.haze end)
-		end
-		if s.water then
-			local terrain = workspace:FindFirstChildOfClass("Terrain")
-			if terrain then
-				pcall(function()
-					terrain.WaterReflectance = s.water.refl
-					terrain.WaterWaveSize = s.water.wave
-					terrain.WaterTransparency = s.water.trans
-				end)
-			end
-		end
-		if s.rq then pcall(function() settings().Rendering.QualityLevel = s.rq end) end
-		if s.quality then
-			pcall(function() UserSettings():GetService("UserGameSettings").SavedQualityLevel = s.quality end)
-		end
-	end
-
-	gui.Destroying:Connect(function() if active then active = false; revertRTX() end end)
-
-	sv3:AddLabel("Realistic graphics: Future lighting, soft shadows, bloom, sun rays, color grading, depth of field, atmosphere and water reflections. Needs a decent GPU; turning it off restores everything.")
-	sv3:AddToggle("RTX Mode", false, function(on)
-		active = on
-		if on then
-			applyRTX()
-			Aurora:Notify("RTX Mode", "Enabled: realistic lighting and effects applied.", 3, "success")
-		else
-			revertRTX()
-			Aurora:Notify("RTX Mode", "Disabled: everything restored.", 2.5)
-		end
-	end)
-	sv3:AddSlider("RTX Intensity", 0, 100, 60, function(v)
-		intensity = v
-		if active and saved then style() end
-	end)
-end
-
 local sv2 = ServerTab:AddSection("Utility")
 do
 	local VirtualUser = game:GetService("VirtualUser")
@@ -3263,6 +3239,8 @@ v3:AddDropdown("Sky Preset", SkyAPI.Order, "Default", function(o)
 	SkyAPI.Set(o)
 	Aurora:Notify("Custom Sky", T_("Gokyuzu: ") .. tostring(o), 2.5)
 end)
+v3:AddToggle("Sky Details (clouds / nebula)", true, function(on) SkyAPI.SetDetail(on) end)
+v3:AddSlider("Cloud Cover", 0, 1, 0.5, function(v) SkyAPI.Over("cover", v) end, 0.05)
 v3:AddToggle("Particles (petal / snow / ember)", true, function(on) SkyAPI.SetParticles(on) end)
 v3:AddSlider("Particle Density", 0.2, 3, 1, function(v) SkyAPI.SetDensity(v) end, 0.1)
 v3:AddSlider("Star Count", 0, 5000, 3000, function(v) SkyAPI.Over("stars", math.floor(v)) end, 100)
