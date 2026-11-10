@@ -3437,6 +3437,7 @@ do
 			Aurora:Notify("Config silindi", name, 3, "warn")
 			refresh()
 		end)
+		return r
 	end
 
 	------------------------------------------------ bolum icerigi
@@ -3512,7 +3513,10 @@ do
 			lbl({ Text = "Henuz kayitli config yok. Ozellikleri ac (ornek: ESP), isim yaz ve 'Save Current UI'a bas.", TextSize = 11, TextColor3 = T.dim, TextWrapped = true, Size = UDim2.new(1, -20, 0, 36), Position = UDim2.fromOffset(10, 0) }).Parent = listBox
 			return
 		end
-		for i, n in ipairs(names) do makeRow(i, n, store.profiles[n]) end
+		for i, n in ipairs(names) do
+			local rf = makeRow(i, n, store.profiles[n])
+			rf.Parent = listBox
+		end
 	end
 	-- listBox bos satir boyu 0: otomatik boyut icin etiket yuksekligi
 	refresh()
@@ -3571,27 +3575,16 @@ do
 		local function mkBtn(text, x, primary, cb)
 			local b = new("TextButton", {
 				Text = "", Size = UDim2.fromOffset(150, 38), Position = UDim2.fromOffset(x, 214),
-				AutoButtonColor = false, BorderSizePixel = 0, BackgroundColor3 = T.row, BackgroundTransparency = primary and 1 or 0,
+				AutoButtonColor = false, BorderSizePixel = 0, BackgroundTransparency = 1,
 			}, { corner(12) })
 			local bs = new("UIScale", { Scale = 1 })
 			bs.Parent = b
-			local txt = lbl({ Text = text, Font = Enum.Font.GothamBlack, TextSize = 13, TextColor3 = primary and WHITE or accent, TextXAlignment = Enum.TextXAlignment.Center, Size = UDim2.fromScale(1, 1), ZIndex = 3 })
-			if primary then
-				-- EVET: tema renginde gradient dolgu (gradient yaziyi boyamasin diye ayri kutu)
-				local fill = new("Frame", { Size = UDim2.fromScale(1, 1), BackgroundColor3 = WHITE, BorderSizePixel = 0, ZIndex = 1 }, { corner(12) })
-				accentGrad(fill, 0)
-				fill.Parent = b
-				txt.Parent = b
-			else
-				-- HAYIR: tema renginde cerceve + yazi
-				txt.Parent = b
-				local bst = stroke(accent, 1.6, 0.1)
-				bst.Parent = b
-				onAccent(function(a)
-					if bst.Parent then bst.Color = a end
-					if txt.Parent then txt.TextColor3 = a end
-				end)
-			end
+			local txt = lbl({ Text = text, Font = Enum.Font.GothamBlack, TextSize = 13, TextColor3 = WHITE, TextXAlignment = Enum.TextXAlignment.Center, Size = UDim2.fromScale(1, 1), ZIndex = 3 })
+			-- EVET ve HAYIR ayni: tema renginde gradient dolgu (gradient yaziyi boyamasin diye ayri kutu)
+			local fill = new("Frame", { Size = UDim2.fromScale(1, 1), BackgroundColor3 = WHITE, BorderSizePixel = 0, ZIndex = 1 }, { corner(12) })
+			accentGrad(fill, 0)
+			fill.Parent = b
+			txt.Parent = b
 			b.MouseEnter:Connect(function() tween(bs, 0.12, { Scale = 1.05 }) end)
 			b.MouseLeave:Connect(function() tween(bs, 0.12, { Scale = 1 }) end)
 			b.MouseButton1Click:Connect(cb)
