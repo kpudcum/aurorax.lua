@@ -103,6 +103,73 @@ function Aurora:ResetTheme()
 	Aurora:SetAccent(ACCENTS.Violet, true)
 end
 
+------------------------------------------------------------------ DIL / LANGUAGE
+-- Turkce -> Ingilizce sozlugu. Zaten Ingilizce olan metinler sozlukte yoksa oldugu gibi kalir.
+local TR_EN = {
+	["EMEGI GECENLER"] = "CREDITS",
+	["Server Hop (rastgele)"] = "Server Hop (random)",
+	["Server Hop (en bos sunucu)"] = "Server Hop (emptiest server)",
+	["Apply Preset Time (gece/gunduz)"] = "Apply Preset Time (day/night)",
+	["Sky Time (saat)"] = "Sky Time (hour)",
+	["Menu Scale (Boyut)"] = "Menu Scale (Size)",
+	["Go Back (onceki konum)"] = "Go Back (previous location)",
+	["PC: Ctrl basili tut + tikla. Mobil: ekrana dokun."] = "PC: hold Ctrl + click. Mobile: tap the screen.",
+	["Dokun: Toggle'da ac/kapat, Hold'da basili tut. Surukleyerek tasi."] = "Tap: toggles on/off in Toggle mode, hold in Hold mode. Drag to move.",
+	["Emegi gecen"] = "Contributor",
+	["Language"] = "Language",
+	["Dil"] = "Language",
+	["Arayuz dili"] = "Interface language",
+	["Etiket ve baslik metinlerini aninda Turkce / Ingilizce arasinda degistirir."] = "Instantly switches labels and titles between Turkish and English.",
+}
+
+local Lang = "tr"
+local langListeners = {}
+local translRegistry = {}
+
+-- key: orijinal (Turkce) metin. Donus: secili dile gore metin.
+local function T_(key)
+	if Lang == "en" then
+		return TR_EN[key] or key
+	end
+	return key
+end
+
+-- obj.Text, dil degisince otomatik guncellenir. xform verilirse (ornek: string.upper) sonuca uygulanir.
+local function regT(obj, key, xform)
+	translRegistry[#translRegistry + 1] = { obj = obj, key = key, xform = xform }
+end
+
+local function onLangChange(fn)
+	table.insert(langListeners, fn)
+end
+
+local function applyLangTexts()
+	for i = #translRegistry, 1, -1 do
+		local e = translRegistry[i]
+		if not e.obj or not e.obj.Parent then
+			table.remove(translRegistry, i)
+		else
+			local txt = T_(e.key)
+			if e.xform then txt = e.xform(txt) end
+			e.obj.Text = txt
+		end
+	end
+	for _, fn in ipairs(langListeners) do
+		pcall(fn, Lang)
+	end
+end
+
+function Aurora:SetLanguage(code)
+	if code ~= "tr" and code ~= "en" then return end
+	if Lang == code then return end
+	Lang = code
+	applyLangTexts()
+end
+
+function Aurora:GetLanguage()
+	return Lang
+end
+
 ------------------------------------------------------------------ YARDIMCILAR
 local function tween(o, t, p, style, dir)
 	local tw = TweenService:Create(o, TweenInfo.new(t, style or Enum.EasingStyle.Quint, dir or Enum.EasingDirection.Out), p)
@@ -722,8 +789,9 @@ function Aurora:CreateWindow(titleText, subtitle)
 		else
 			g.Text = (glyph and glyph ~= "" and glyph ~= "o") and glyph or string.upper(string.sub(name or "?", 1, 1))
 		end
-		local tx = label({ Text = name, Font = Enum.Font.GothamBold, TextSize = 13, TextColor3 = T.sub, Size = UDim2.new(1, -44, 1, 0), Position = UDim2.fromOffset(40, 0) })
+		local tx = label({ Text = T_(name), Font = Enum.Font.GothamBold, TextSize = 13, TextColor3 = T.sub, Size = UDim2.new(1, -44, 1, 0), Position = UDim2.fromOffset(40, 0) })
 		tx.Parent = btn
+		regT(tx, name)
 		onAccent(function(a) if current == name then g.TextColor3 = a end end)
 		btn.MouseEnter:Connect(function() if current ~= name then tween(bg, 0.15, { BackgroundTransparency = 0.93 }) end end)
 		btn.MouseLeave:Connect(function() if current ~= name then tween(bg, 0.15, { BackgroundTransparency = 1 }) end end)
@@ -752,7 +820,9 @@ function Aurora:CreateWindow(titleText, subtitle)
 			local dotS = new("Frame", { Size = UDim2.fromOffset(6, 6), Position = UDim2.fromOffset(16, 16), BackgroundColor3 = accent, BorderSizePixel = 0 }, { corner(3) })
 			onAccent(function(a) dotS.BackgroundColor3 = a end)
 			dotS.Parent = head
-			label({ Text = string.upper(title), Font = Enum.Font.GothamBold, TextSize = 11, TextColor3 = T.sub, Size = UDim2.new(1, -60, 1, 0), Position = UDim2.fromOffset(30, 0) }).Parent = head
+			local __trSec = label({ Text = string.upper(T_(title)), Font = Enum.Font.GothamBold, TextSize = 11, TextColor3 = T.sub, Size = UDim2.new(1, -60, 1, 0), Position = UDim2.fromOffset(30, 0) })
+			__trSec.Parent = head
+			regT(__trSec, title, string.upper)
 			local arrow = label({ Text = "v", TextSize = 13, TextColor3 = T.dim, TextXAlignment = Enum.TextXAlignment.Center, Size = UDim2.fromOffset(30, 38), Position = UDim2.new(1, -38, 0, 0) })
 			arrow.Parent = head
 			head.Parent = card
@@ -783,7 +853,9 @@ function Aurora:CreateWindow(titleText, subtitle)
 
 			function Section:AddLabel(t)
 				local r = row(32, t)
-				label({ Text = t, TextSize = 12, TextColor3 = T.sub, Size = UDim2.new(1, -28, 1, 0), Position = UDim2.fromOffset(14, 0) }).Parent = r
+				local __trLb = label({ Text = T_(t), TextSize = 12, TextColor3 = T.sub, Size = UDim2.new(1, -28, 1, 0), Position = UDim2.fromOffset(14, 0) })
+				__trLb.Parent = r
+				regT(__trLb, t)
 			end
 
 			-- Ozel icerik icin bos, otomatik boyutlanan kap (liste vb.)
@@ -865,8 +937,9 @@ function Aurora:CreateWindow(titleText, subtitle)
 				local r = row(40, t)
 				r.ClipsDescendants = true
 				hover(r)
-				local b = new("TextButton", { Text = t, Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Font = Enum.Font.GothamBold, TextSize = 13, TextColor3 = T.text, AutoButtonColor = false })
+				local b = new("TextButton", { Text = T_(t), Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Font = Enum.Font.GothamBold, TextSize = 13, TextColor3 = T.text, AutoButtonColor = false })
 				b.Parent = r
+				regT(b, t)
 				label({ Text = ">", Font = Enum.Font.GothamBold, TextSize = 18, TextColor3 = T.dim, TextXAlignment = Enum.TextXAlignment.Center, Size = UDim2.fromOffset(30, 40), Position = UDim2.new(1, -34, 0, 0) }).Parent = r
 				b.MouseButton1Click:Connect(function()
 					local mp = UIS:GetMouseLocation()
@@ -881,7 +954,9 @@ function Aurora:CreateWindow(titleText, subtitle)
 				local state = default and true or false
 				local r = row(40, t)
 				hover(r)
-				label({ Text = t, Size = UDim2.new(1, -80, 1, 0), Position = UDim2.fromOffset(14, 0), TextColor3 = T.text }).Parent = r
+				local __trTg = label({ Text = T_(t), Size = UDim2.new(1, -80, 1, 0), Position = UDim2.fromOffset(14, 0), TextColor3 = T.text })
+				__trTg.Parent = r
+				regT(__trTg, t)
 				local pill = new("TextButton", { Text = "", Size = UDim2.fromOffset(42, 22), Position = UDim2.new(1, -56, 0.5, -11), BackgroundColor3 = Color3.new(1, 1, 1), AutoButtonColor = false, BorderSizePixel = 0 }, { corner(11) })
 				local pg = new("UIGradient", {})
 				pg.Parent = pill
@@ -912,7 +987,9 @@ function Aurora:CreateWindow(titleText, subtitle)
 				local value = default or min
 				local r = row(58, t)
 				hover(r)
-				label({ Text = t, Size = UDim2.new(1, -100, 0, 28), Position = UDim2.fromOffset(14, 4), TextColor3 = T.text }).Parent = r
+				local __trSl = label({ Text = T_(t), Size = UDim2.new(1, -100, 0, 28), Position = UDim2.fromOffset(14, 4), TextColor3 = T.text })
+				__trSl.Parent = r
+				regT(__trSl, t)
 				local vbox = new("Frame", { Size = UDim2.fromOffset(54, 22), Position = UDim2.new(1, -68, 0, 7), BackgroundColor3 = T.bg1, BackgroundTransparency = 0.3, BorderSizePixel = 0 }, { corner(7) })
 				onThemeChange(function(k, c) if k == "bg1" then vbox.BackgroundColor3 = c end end)
 				local val = label({ Text = tostring(value), Font = Enum.Font.Code, TextSize = 12, TextColor3 = T.text, TextXAlignment = Enum.TextXAlignment.Center, Size = UDim2.fromScale(1, 1) })
@@ -954,7 +1031,9 @@ function Aurora:CreateWindow(titleText, subtitle)
 				r.ClipsDescendants = true
 				local head = new("TextButton", { Text = "", Size = UDim2.new(1, 0, 0, 40), BackgroundTransparency = 1, AutoButtonColor = false })
 				head.Parent = r
-				label({ Text = t, Size = UDim2.new(0.5, 0, 1, 0), Position = UDim2.fromOffset(14, 0), TextColor3 = T.text }).Parent = head
+				local __trDd = label({ Text = T_(t), Size = UDim2.new(0.5, 0, 1, 0), Position = UDim2.fromOffset(14, 0), TextColor3 = T.text })
+				__trDd.Parent = head
+				regT(__trDd, t)
 				local cur = label({ Text = current, TextSize = 12, TextColor3 = T.sub, TextXAlignment = Enum.TextXAlignment.Right, Size = UDim2.new(0.5, -40, 1, 0), Position = UDim2.new(0.5, 0, 0, 0) })
 				cur.Parent = head
 				local arr = label({ Text = "v", TextSize = 12, TextColor3 = T.dim, TextXAlignment = Enum.TextXAlignment.Center, Size = UDim2.fromOffset(26, 40), Position = UDim2.new(1, -30, 0, 0) })
@@ -1006,7 +1085,9 @@ function Aurora:CreateWindow(titleText, subtitle)
 				local listening = false
 				local r = row(40, t)
 				hover(r)
-				label({ Text = t, Size = UDim2.new(1, -110, 1, 0), Position = UDim2.fromOffset(14, 0), TextColor3 = T.text }).Parent = r
+				local __trKb = label({ Text = T_(t), Size = UDim2.new(1, -110, 1, 0), Position = UDim2.fromOffset(14, 0), TextColor3 = T.text })
+				__trKb.Parent = r
+				regT(__trKb, t)
 				
 				local function getBindName(b)
 					if not b then return "None" end
@@ -1075,7 +1156,9 @@ function Aurora:CreateWindow(titleText, subtitle)
 				r.ClipsDescendants = true
 				local head = new("TextButton", { Text = "", Size = UDim2.new(1, 0, 0, 40), BackgroundTransparency = 1, AutoButtonColor = false })
 				head.Parent = r
-				label({ Text = t, Size = UDim2.new(1, -80, 1, 0), Position = UDim2.fromOffset(14, 0), TextColor3 = T.text }).Parent = head
+				local __trCp = label({ Text = T_(t), Size = UDim2.new(1, -80, 1, 0), Position = UDim2.fromOffset(14, 0), TextColor3 = T.text })
+				__trCp.Parent = head
+				regT(__trCp, t)
 				local sw = new("Frame", { Size = UDim2.fromOffset(34, 20), Position = UDim2.new(1, -48, 0.5, -10), BackgroundColor3 = Color3.fromHSV(h, s, v), BorderSizePixel = 0 }, { corner(6), stroke(T.line, 1, 0.2) })
 				sw.Parent = head
 				local function apply()
@@ -1123,7 +1206,9 @@ function Aurora:CreateWindow(titleText, subtitle)
 			function Section:AddTextbox(t, placeholder, cb)
 				local r = row(40, t)
 				hover(r)
-				label({ Text = t, Size = UDim2.new(0.45, 0, 1, 0), Position = UDim2.fromOffset(14, 0), TextColor3 = T.text }).Parent = r
+				local __trTb = label({ Text = T_(t), Size = UDim2.new(0.45, 0, 1, 0), Position = UDim2.fromOffset(14, 0), TextColor3 = T.text })
+				__trTb.Parent = r
+				regT(__trTb, t)
 				local tb = new("TextBox", { Size = UDim2.new(0.5, -20, 0, 26), Position = UDim2.new(0.5, 6, 0.5, -13), BackgroundColor3 = T.bg1, BackgroundTransparency = 0.3, BorderSizePixel = 0, Text = "", PlaceholderText = placeholder or "...", PlaceholderColor3 = T.dim, TextColor3 = T.text, Font = Enum.Font.Gotham, TextSize = 12, ClearTextOnFocus = false }, { corner(8), pad(10, 0, 10, 0), stroke(T.line, 1, 0.3) })
 				onThemeChange(function(k, c) if k == "bg1" then tb.BackgroundColor3 = c end end)
 				tb.Parent = r
@@ -3285,6 +3370,14 @@ s1:AddButton("Reset Theme Colors", function()
 	Aurora:ResetTheme()
 	Aurora:Notify("Sifirlandi", "Tum tema renkleri ve arka planlar varsayilan ayarlara donduruldu.", 3, "success")
 end)
+
+local sLang = Settings:AddSection("Dil")
+sLang:AddDropdown("Dil", { "Turkce", "English" }, (Aurora:GetLanguage() == "en") and "English" or "Turkce", function(o)
+	local code = (o == "English") and "en" or "tr"
+	Aurora:SetLanguage(code)
+	Aurora:Notify(T_("Dil"), code == "en" and "Interface switched to English." or "Arayuz dili Turkce yapildi.", 2.5, "success")
+end)
+sLang:AddLabel("Etiket ve baslik metinlerini aninda Turkce / Ingilizce arasinda degistirir.")
 
 local sPack = Settings:AddSection("Theme Packs & Backgrounds")
 do
