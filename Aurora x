@@ -2857,9 +2857,10 @@ do
 	end)
 	local function paintSel()
 		for _, e in ipairs(entries) do
-			local on = TP.Selected == e.plr
-			e.st.Color = on and accent or T.line
-			e.st.Transparency = on and 0 or 0.5
+			if e.plr and e.st.Parent then
+				local on = TP.Selected == e.plr
+				tween(e.st, 0.18, { Color = on and accent or T.line, Transparency = on and 0 or 0.5, Thickness = on and 2 or 1 })
+			end
 		end
 	end
 	refreshList = function()
@@ -2891,7 +2892,7 @@ do
 			go.Parent = f
 			table.insert(accentObjs, go)
 			f.MouseButton1Click:Connect(function()
-				TP.Selected = p
+				if TP.Selected == p then TP.Selected = nil else TP.Selected = p end
 				paintSel()
 			end)
 			go.MouseButton1Click:Connect(function()
@@ -2985,9 +2986,19 @@ do
 	end)
 	local savedBox = tp2:AddContainer()
 	local savedEntries = {}
+	local selLoc, locStrokes = nil, {}
+	local function paintLoc()
+		for sv, st in pairs(locStrokes) do
+			if st.Parent then
+				local on = selLoc == sv
+				tween(st, 0.18, { Color = on and accent or T.line, Transparency = on and 0 or 0.5, Thickness = on and 2 or 1 })
+			end
+		end
+	end
 	refreshSaved = function()
 		for _, f in ipairs(savedEntries) do f:Destroy() end
 		savedEntries = {}
+		locStrokes = {}
 		if #saved == 0 then
 			local e = label({ Text = "Kayitli konum yok", TextSize = 12, TextColor3 = T.dim, TextXAlignment = Enum.TextXAlignment.Center, Size = UDim2.new(1, 0, 0, 30) })
 			e.Parent = savedBox
@@ -2996,14 +3007,21 @@ do
 		end
 		for n, s in ipairs(saved) do
 			local f = new("Frame", { Size = UDim2.new(1, 0, 0, 46), BackgroundColor3 = T.row2, BackgroundTransparency = 0.3, BorderSizePixel = 0, LayoutOrder = n }, { corner(10), stroke(T.line, 1, 0.5) })
+			locStrokes[s] = f:FindFirstChildOfClass("UIStroke")
+			local pick = new("TextButton", { Text = "", Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, AutoButtonColor = false, ZIndex = 1 })
+			pick.MouseButton1Click:Connect(function()
+				if selLoc == s then selLoc = nil else selLoc = s end
+				paintLoc()
+			end)
+			pick.Parent = f
 			local nl = label({ Text = tostring(s.name), Font = Enum.Font.GothamBold, TextSize = 13, Size = UDim2.new(1, -130, 0, 18), Position = UDim2.fromOffset(14, 6) })
 			nl.TextTruncate = Enum.TextTruncate.AtEnd
 			nl.Parent = f
 			label({ Text = tostring(s.x) .. ", " .. tostring(s.y) .. ", " .. tostring(s.z), TextSize = 11, TextColor3 = T.dim, Size = UDim2.new(1, -130, 0, 14), Position = UDim2.fromOffset(14, 25) }).Parent = f
-			local go = new("TextButton", { Text = "GO", Size = UDim2.fromOffset(44, 28), Position = UDim2.new(1, -96, 0.5, -14), BackgroundColor3 = accent, Font = Enum.Font.GothamBlack, TextSize = 12, TextColor3 = Color3.new(1, 1, 1), AutoButtonColor = false, BorderSizePixel = 0 }, { corner(8) })
+			local go = new("TextButton", { Text = "GO", Size = UDim2.fromOffset(44, 28), Position = UDim2.new(1, -96, 0.5, -14), BackgroundColor3 = accent, Font = Enum.Font.GothamBlack, TextSize = 12, TextColor3 = Color3.new(1, 1, 1), AutoButtonColor = false, BorderSizePixel = 0, ZIndex = 3 }, { corner(8) })
 			go.Parent = f
 			table.insert(accentObjs, go)
-			local del = new("TextButton", { Text = "X", Size = UDim2.fromOffset(34, 28), Position = UDim2.new(1, -46, 0.5, -14), BackgroundColor3 = T.err, BackgroundTransparency = 0.25, Font = Enum.Font.GothamBlack, TextSize = 12, TextColor3 = Color3.new(1, 1, 1), AutoButtonColor = false, BorderSizePixel = 0 }, { corner(8) })
+			local del = new("TextButton", { Text = "X", Size = UDim2.fromOffset(34, 28), Position = UDim2.new(1, -46, 0.5, -14), BackgroundColor3 = T.err, BackgroundTransparency = 0.25, Font = Enum.Font.GothamBlack, TextSize = 12, TextColor3 = Color3.new(1, 1, 1), AutoButtonColor = false, BorderSizePixel = 0, ZIndex = 3 }, { corner(8) })
 			del.Parent = f
 			go.MouseButton1Click:Connect(function()
 				if goCF(CFrame.new(s.x, s.y, s.z)) then say(tostring(s.name) .. " konumuna isinlandin") end
@@ -3381,10 +3399,30 @@ do
 	local pendingRefresh = false
 	local rowFrames = {}
 
+	local selCfg = nil
+	local function paintCfg()
+		for _, rf in ipairs(rowFrames) do
+			local st = rf.Parent and rf:FindFirstChildOfClass("UIStroke")
+			if st then
+				local on = selCfg == rf:GetAttribute("cfg")
+				local last = rf:GetAttribute("last")
+				tween(st, 0.18, { Color = (on or last) and accent or T.line, Transparency = on and 0 or (last and 0.35 or 0.55), Thickness = on and 2 or 1 })
+			end
+		end
+	end
+
 	local function makeRow(i, name, prof)
 		local isLast = name == store.last
 		local r = new("Frame", { Size = UDim2.new(1, 0, 0, 64), BackgroundColor3 = T.row, BorderSizePixel = 0, LayoutOrder = i }, { corner(12), stroke(isLast and accent or T.line, 1, isLast and 0.35 or 0.55) })
+		r:SetAttribute("cfg", name)
+		r:SetAttribute("last", isLast)
 		table.insert(rowFrames, r)
+		local pick = new("TextButton", { Text = "", Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, AutoButtonColor = false, ZIndex = 1 })
+		pick.MouseButton1Click:Connect(function()
+			if selCfg == name then selCfg = nil else selCfg = name end
+			paintCfg()
+		end)
+		pick.Parent = r
 
 		local ic = new("Frame", { Size = UDim2.fromOffset(40, 40), Position = UDim2.fromOffset(12, 12), BackgroundColor3 = WHITE, BorderSizePixel = 0 }, { corner(12) })
 		accentGrad(ic, 45)
@@ -3399,7 +3437,7 @@ do
 			TextSize = 11, TextColor3 = T.dim, TextTruncate = Enum.TextTruncate.AtEnd, Size = UDim2.new(1, -190, 0, 16), Position = UDim2.fromOffset(62, 34),
 		}).Parent = r
 
-		local load = new("TextButton", { Text = "", Size = UDim2.fromOffset(58, 28), Position = UDim2.new(1, -130, 0.5, -14), BackgroundTransparency = 1, AutoButtonColor = false, BorderSizePixel = 0 }, { corner(10) })
+		local load = new("TextButton", { Text = "", Size = UDim2.fromOffset(58, 28), Position = UDim2.new(1, -130, 0.5, -14), BackgroundTransparency = 1, AutoButtonColor = false, BorderSizePixel = 0, ZIndex = 3 }, { corner(10) })
 		local loadFill = new("Frame", { Size = UDim2.fromScale(1, 1), BackgroundColor3 = WHITE, BorderSizePixel = 0, ZIndex = 1 }, { corner(10) })
 		accentGrad(loadFill, 0)
 		loadFill.Parent = load
@@ -3407,7 +3445,7 @@ do
 		load.Parent = r
 		load.MouseButton1Click:Connect(function() applyProfile(name) end)
 
-		local del = new("TextButton", { Text = "DELETE", Size = UDim2.fromOffset(58, 28), Position = UDim2.new(1, -68, 0.5, -14), BackgroundColor3 = T.row2, Font = Enum.Font.GothamBold, TextSize = 10, TextColor3 = T.err, AutoButtonColor = false, BorderSizePixel = 0 }, { corner(10), stroke(T.err, 1, 0.6) })
+		local del = new("TextButton", { Text = "DELETE", Size = UDim2.fromOffset(58, 28), Position = UDim2.new(1, -68, 0.5, -14), BackgroundColor3 = T.row2, Font = Enum.Font.GothamBold, TextSize = 10, TextColor3 = T.err, AutoButtonColor = false, BorderSizePixel = 0, ZIndex = 3 }, { corner(10), stroke(T.err, 1, 0.6) })
 		del.Parent = r
 		local armed = false
 		del.MouseButton1Click:Connect(function()
