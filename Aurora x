@@ -129,6 +129,10 @@ local TR_EN = {
 	["Dosya sistemi yok: kayitlar sadece bu oturumda kalir."] = "No file system: saves last only for this session.",
 	["Config yuklendi"] = "Config loaded",
 	["Config silindi"] = "Config deleted",
+	["Config guncellendi"] = "Config updated",
+	["Emin misin?"] = "Are you sure?",
+	[" - tekrar basarak onayla"] = " - press again to confirm",
+	["Once listeden bir config sec"] = "Select a config from the list first",
 	["Config kaydedildi"] = "Config saved",
 	["Kayitli config yok."] = "No saved config.",
 	["Acilista sorma kapatildi. Settings > Config'ten tekrar acabilirsin."] = "Ask-on-open is off. You can turn it on again in Settings > Config.",
@@ -963,7 +967,7 @@ function Aurora:CreateWindow(titleText, subtitle)
 					local my = token
 					if ok then
 						pillL.Text = "COPIED"
-						Aurora:Notify("Discord", "Davet linki kopyalandi.", 3, "success")
+						Aurora:Notify("Discord", "Invite link copied.", 3, "success")
 					else
 						pillL.Text = "LINK"
 						Aurora:Notify("Discord", copyText, 8)
@@ -983,7 +987,7 @@ function Aurora:CreateWindow(titleText, subtitle)
 				label({ Text = string.upper(string.sub(name, 1, 1)), Font = Enum.Font.GothamBlack, TextSize = 15, TextColor3 = Color3.new(1, 1, 1), TextXAlignment = Enum.TextXAlignment.Center, Size = UDim2.fromScale(1, 1) }).Parent = av
 				av.Parent = r
 				label({ Text = name, Font = Enum.Font.GothamBold, TextSize = 14, Size = UDim2.new(1, -150, 0, 20), Position = UDim2.fromOffset(56, 9) }).Parent = r
-				label({ Text = role or "Emegi gecen", TextSize = 11, TextColor3 = T.dim, Size = UDim2.new(1, -150, 0, 14), Position = UDim2.fromOffset(56, 29) }).Parent = r
+				label({ Text = role or "Contributor", TextSize = 11, TextColor3 = T.dim, Size = UDim2.new(1, -150, 0, 14), Position = UDim2.fromOffset(56, 29) }).Parent = r
 				local tag = new("Frame", { Size = UDim2.fromOffset(60, 20), Position = UDim2.new(1, -74, 0.5, -10), BackgroundColor3 = accent, BackgroundTransparency = 0.8, BorderSizePixel = 0 }, { corner(10) })
 				local tagL = label({ Text = "TEAM", Font = Enum.Font.GothamBlack, TextSize = 10, TextColor3 = accent, TextXAlignment = Enum.TextXAlignment.Center, Size = UDim2.fromScale(1, 1) })
 				tagL.Parent = tag
@@ -1222,18 +1226,26 @@ function Aurora:CreateWindow(titleText, subtitle)
 				regT(__trCp, t)
 				local sw = new("Frame", { Size = UDim2.fromOffset(34, 20), Position = UDim2.new(1, -48, 0.5, -10), BackgroundColor3 = Color3.fromHSV(h, s, v), BorderSizePixel = 0 }, { corner(6), stroke(T.line, 1, 0.2) })
 				sw.Parent = head
+				local satG, valG
+				-- doygunluk / parlaklik cubuklari secili tona gore renklenir
+				local function tintBars()
+					if satG then satG.Color = ColorSequence.new(Color3.fromHSV(h, 0, 1), Color3.fromHSV(h, 1, 1)) end
+					if valG then valG.Color = ColorSequence.new(Color3.new(0, 0, 0), Color3.fromHSV(h, s, 1)) end
+				end
 				local function apply()
 					local c = Color3.fromHSV(h, s, v)
 					sw.BackgroundColor3 = c
+					tintBars()
 					if cb then cb(c) end
 				end
 				local function bar(y, seq, onRel)
-					local tr = new("Frame", { Size = UDim2.new(1, -28, 0, 10), Position = UDim2.fromOffset(14, y), BackgroundColor3 = Color3.new(1, 1, 1), BorderSizePixel = 0 }, { corner(5), new("UIGradient", { Color = seq }) })
+					local grad = new("UIGradient", { Color = seq })
+					local tr = new("Frame", { Size = UDim2.new(1, -28, 0, 10), Position = UDim2.fromOffset(14, y), BackgroundColor3 = Color3.new(1, 1, 1), BorderSizePixel = 0 }, { corner(5), grad })
 					local k = new("Frame", { Size = UDim2.fromOffset(6, 16), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), BackgroundColor3 = Color3.new(1, 1, 1), BorderSizePixel = 0 }, { corner(3), stroke(Color3.new(0, 0, 0), 1, 0.4) })
 					k.Parent = tr
 					tr.Parent = r
 					makeDrag(tr, function(rel) k.Position = UDim2.fromScale(rel, 0.5) onRel(rel) end)
-					return k
+					return k, grad
 				end
 				local hueSeq = ColorSequence.new({
 					ColorSequenceKeypoint.new(0, Color3.fromHSV(0, 1, 1)), ColorSequenceKeypoint.new(0.17, Color3.fromHSV(0.17, 1, 1)),
@@ -1243,12 +1255,17 @@ function Aurora:CreateWindow(titleText, subtitle)
 				})
 				local hueK = bar(48, hueSeq, function(rel) h = rel apply() end)
 				hueK.Position = UDim2.fromScale(h, 0.5)
-				local valK = bar(70, ColorSequence.new(Color3.new(0, 0, 0), Color3.new(1, 1, 1)), function(rel) v = rel apply() end)
+				local satK
+				satK, satG = bar(70, ColorSequence.new(Color3.new(1, 1, 1), Color3.new(1, 0, 0)), function(rel) s = rel apply() end)
+				satK.Position = UDim2.fromScale(s, 0.5)
+				local valK
+				valK, valG = bar(92, ColorSequence.new(Color3.new(0, 0, 0), Color3.new(1, 1, 1)), function(rel) v = rel apply() end)
 				valK.Position = UDim2.fromScale(v, 0.5)
+				tintBars()
 				local open = false
 				head.MouseButton1Click:Connect(function()
 					open = not open
-					tween(r, 0.3, { Size = UDim2.new(1, 0, 0, open and 96 or 40) })
+					tween(r, 0.3, { Size = UDim2.new(1, 0, 0, open and 120 or 40) })
 				end)
 				local obj = {
 					Get = function() return Color3.fromHSV(h, s, v) end,
@@ -1256,6 +1273,7 @@ function Aurora:CreateWindow(titleText, subtitle)
 						if typeof(c) ~= "Color3" then return end
 						h, s, v = c:ToHSV()
 						hueK.Position = UDim2.fromScale(h, 0.5)
+						satK.Position = UDim2.fromScale(s, 0.5)
 						valK.Position = UDim2.fromScale(v, 0.5)
 						apply()
 					end,
@@ -2528,6 +2546,7 @@ local Aim = {
 	ShowButton = true,
 	ButtonSize = AIM_MOBILE and 72 or 58,
 	FOVColor = Color3.fromRGB(139, 108, 255),
+	FOVRainbow = false,
 	MaxDistance = 1000,
 	TeamCheck = false,
 	WallCheck = false,
@@ -2541,6 +2560,14 @@ local fovCircle = new("Frame", {
 	Size = UDim2.fromOffset(300, 300), Visible = false, ZIndex = 5,
 }, { new("UICorner", { CornerRadius = UDim.new(0.5, 0) }), stroke(Color3.fromRGB(139, 108, 255), 1.5, 0.15) })
 local fovStroke = fovCircle:FindFirstChildOfClass("UIStroke")
+-- rainbow FOV: daire cercevesi donen gokkusagi gradyani ile boyanir (basi ve sonu ayni renk, dikissiz)
+local fovGrad = new("UIGradient", { Enabled = false, Color = ColorSequence.new({
+	ColorSequenceKeypoint.new(0, Color3.fromHSV(0, 0.8, 1)), ColorSequenceKeypoint.new(0.17, Color3.fromHSV(0.17, 0.8, 1)),
+	ColorSequenceKeypoint.new(0.33, Color3.fromHSV(0.33, 0.8, 1)), ColorSequenceKeypoint.new(0.5, Color3.fromHSV(0.5, 0.8, 1)),
+	ColorSequenceKeypoint.new(0.67, Color3.fromHSV(0.67, 0.8, 1)), ColorSequenceKeypoint.new(0.83, Color3.fromHSV(0.83, 0.8, 1)),
+	ColorSequenceKeypoint.new(1, Color3.fromHSV(1, 0.8, 1)),
+}) })
+fovGrad.Parent = fovStroke
 onAccent(function(a) if not Aim.FOVColor or Aim.FOVColor == Color3.fromRGB(139, 108, 255) then fovStroke.Color = a end end)
 fovCircle.Parent = gui
 
@@ -2633,7 +2660,14 @@ RunService:BindToRenderStep("AimbotUI_Step", Enum.RenderPriority.Camera.Value + 
 	if showFov then
 		fovCircle.Position = UDim2.fromOffset(cursor.X, cursor.Y)
 		fovCircle.Size = UDim2.fromOffset(Aim.FOV * 2, Aim.FOV * 2)
-		fovStroke.Color = Aim.FOVColor
+		if Aim.FOVRainbow then
+			if not fovGrad.Enabled then fovGrad.Enabled = true end
+			fovStroke.Color = Color3.new(1, 1, 1)
+			fovGrad.Rotation = (os.clock() * 120) % 360
+		else
+			if fovGrad.Enabled then fovGrad.Enabled = false end
+			fovStroke.Color = Aim.FOVColor
+		end
 	end
 
 	local aiming = isAiming()
@@ -3009,7 +3043,7 @@ local Home = Window:AddTab("Home", "o")
 Home:AddDashboard()
 local hDiscord = Home:AddSection("DISCORD")
 hDiscord:AddCopyCard("Discord Server", "discord.gg/tHUHTVzxxV", "https://discord.gg/tHUHTVzxxV")
-local hCredits = Home:AddSection("EMEGI GECENLER")
+local hCredits = Home:AddSection("CREDITS")
 hCredits:AddCredit("kpudfr", "UI Designer")
 hCredits:AddCredit("3qr311", "Scripter")
 
@@ -3090,7 +3124,7 @@ do
 	sv1:AddButton("Rejoin", function()
 		if busy then return end
 		busy = true
-		say("Ayni sunucuya yeniden baglaniliyor...", "warn")
+		say("Reconnecting to the same server...", "warn")
 		local ok = pcall(function()
 			if #Players:GetPlayers() <= 1 then
 				TeleportService:Teleport(game.PlaceId, lp)
@@ -3098,7 +3132,7 @@ do
 				TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, lp)
 			end
 		end)
-		if not ok then say("Rejoin basarisiz", "error") end
+		if not ok then say("Rejoin failed", "error") end
 		task.delay(6, function() busy = false end)
 	end)
 
@@ -3122,17 +3156,17 @@ do
 			if #found > 0 then
 				local pick = smallest and found[1] or found[math.random(1, #found)]
 				ok = pcall(function() TeleportService:TeleportToPlaceInstance(game.PlaceId, pick.id, lp) end)
-				if ok then say(T_("Sunucuya geciliyor (") .. tostring(pick.playing) .. T_(" oyuncu)")) end
+				if ok then say(T_("Joining server (") .. tostring(pick.playing) .. T_(" players)")) end
 			else
 				ok = pcall(function() TeleportService:Teleport(game.PlaceId, lp) end)
-				if ok then say("Sunucu listesi alinamadi, rastgele sunucuya geciliyor", "warn") end
+				if ok then say("Could not get server list, hopping to a random server", "warn") end
 			end
-			if not ok then say("Server hop basarisiz", "error") end
+			if not ok then say("Server hop failed", "error") end
 			task.delay(6, function() busy = false end)
 		end)
 	end
-	sv1:AddButton("Server Hop (rastgele)", function() hop(false) end)
-	sv1:AddButton("Server Hop (en bos sunucu)", function() hop(true) end)
+	sv1:AddButton("Server Hop (random)", function() hop(false) end)
+	sv1:AddButton("Server Hop (emptiest server)", function() hop(true) end)
 end
 
 local sv1b = ServerTab:AddSection("Safezone")
@@ -3270,7 +3304,7 @@ do
 		if not on then return end
 		afkOn = true
 		afkConn = lp.Idled:Connect(poke)
-		Aurora:Notify("Anti AFK", "Aktif: AFK atilmayacaksin", 2.5, "success")
+		Aurora:Notify("Anti AFK", "Active: you will not be kicked for AFK", 2.5, "success")
 		task.spawn(function()
 			-- Idled tetiklenmese bile 2 dakikada bir hareket gonder
 			while afkOn do
@@ -3296,7 +3330,7 @@ v1:AddToggle("Bright mode", false, function(on) Lighting.Brightness = on and 3 o
 local v3 = Visuals:AddSection("Custom Sky")
 v3:AddDropdown("Sky Preset", SkyAPI.Order, "Default", function(o)
 	SkyAPI.Set(o)
-	Aurora:Notify("Custom Sky", T_("Gokyuzu: ") .. tostring(o), 2.5)
+	Aurora:Notify("Custom Sky", T_("Sky: ") .. tostring(o), 2.5)
 end)
 v3:AddToggle("Sky Details (clouds / nebula)", true, function(on) SkyAPI.SetDetail(on) end)
 v3:AddSlider("Cloud Cover", 0, 1, 0.5, function(v) SkyAPI.Over("cover", v) end, 0.05)
@@ -3306,11 +3340,11 @@ v3:AddSlider("Star Count", 0, 5000, 3000, function(v) SkyAPI.Over("stars", math.
 v3:AddSlider("Atmosphere Density", 0, 1, 0.3, function(v) SkyAPI.Over("dens", v) end, 0.05)
 v3:AddColorPicker("Atmosphere Color", Color3.fromRGB(200, 200, 255), function(c) SkyAPI.Over("acol", c) end)
 v3:AddColorPicker("Horizon Color", Color3.fromRGB(255, 150, 120), function(c) SkyAPI.Over("dec", c) end)
-v3:AddToggle("Apply Preset Time (gece/gunduz)", true, function(on) SkyAPI.SetTime(on) end)
-v3:AddSlider("Sky Time (saat)", 0, 24, 12, function(v) SkyAPI.SetClock(v) end, 0.5)
+v3:AddToggle("Apply Preset Time (day/night)", true, function(on) SkyAPI.SetTime(on) end)
+v3:AddSlider("Sky Time (hour)", 0, 24, 12, function(v) SkyAPI.SetClock(v) end, 0.5)
 v3:AddButton("Reset Sky", function()
 	SkyAPI.Reset()
-	Aurora:Notify("Custom Sky", "Gokyuzu sifirlandi", 2.5)
+	Aurora:Notify("Custom Sky", "Sky reset", 2.5)
 end)
 
 local v2 = Visuals:AddSection("Colors")
@@ -3354,7 +3388,7 @@ do
 	local tweenObj = nil
 	local function goCF(cf, noLift)
 		local r = rootOf(lp)
-		if not r then say("Karakter bulunamadi", "error") return false end
+		if not r then say("Character not found", "error") return false end
 		TP.Back = r.CFrame
 		if tweenObj then tweenObj:Cancel() tweenObj = nil end
 		local target = noLift and cf or (cf + Vector3.new(0, TP.Lift, 0))
@@ -3369,7 +3403,7 @@ do
 	end
 	local function goPlayer(p)
 		local r = rootOf(p)
-		if not p or not r then say("Oyuncu bulunamadi veya karakteri yok", "error") return end
+		if not p or not r then say("Player not found or has no character", "error") return end
 		if goCF(r.CFrame * CFrame.new(0, 0, 3)) then say(p.DisplayName .. " yanina isinlandin") end
 	end
 
@@ -3452,7 +3486,7 @@ do
 			table.insert(entries, { plr = p, frame = f, st = st, dist = dist })
 		end
 		if #plist == 0 then
-			local e = label({ Text = "Oyuncu bulunamadi", TextSize = 12, TextColor3 = T.dim, TextXAlignment = Enum.TextXAlignment.Center, Size = UDim2.new(1, 0, 0, 30) })
+			local e = label({ Text = "No players found", TextSize = 12, TextColor3 = T.dim, TextXAlignment = Enum.TextXAlignment.Center, Size = UDim2.new(1, 0, 0, 30) })
 			e.Parent = listBox
 			table.insert(entries, { plr = nil, frame = e, st = { Color = T.line, Transparency = 0 }, dist = nil })
 		end
@@ -3479,12 +3513,12 @@ do
 	end))
 
 	tp1:AddButton("Teleport to Selected", function()
-		if not TP.Selected then say("Once listeden bir oyuncuya dokun", "warn") return end
+		if not TP.Selected then say("Tap a player in the list first", "warn") return end
 		goPlayer(TP.Selected)
 	end)
 	tp1:AddButton("Teleport to Nearest Player", function()
 		local mine = rootOf(lp)
-		if not mine then say("Karakter bulunamadi", "error") return end
+		if not mine then say("Character not found", "error") return end
 		local best, bd = nil, math.huge
 		for _, p in ipairs(Players:GetPlayers()) do
 			local r = rootOf(p)
@@ -3493,14 +3527,14 @@ do
 				if d < bd then best, bd = p, d end
 			end
 		end
-		if best then goPlayer(best) else say("Yakinda oyuncu yok", "warn") end
+		if best then goPlayer(best) else say("No player nearby", "warn") end
 	end)
 	tp1:AddButton("Teleport to Random Player", function()
 		local pool = {}
 		for _, p in ipairs(Players:GetPlayers()) do
 			if p ~= lp and rootOf(p) then table.insert(pool, p) end
 		end
-		if #pool == 0 then say("Oyuncu yok", "warn") return end
+		if #pool == 0 then say("No players", "warn") return end
 		goPlayer(pool[math.random(1, #pool)])
 	end)
 	tp1:AddToggle("Spectate Selected", false, function(on)
@@ -3510,7 +3544,7 @@ do
 				workspace.CurrentCamera.CameraSubject = h
 				spectating = true
 			else
-				say("Once listeden bir oyuncu sec", "warn")
+				say("Select a player from the list first", "warn")
 			end
 		else
 			stopSpec()
@@ -3524,13 +3558,13 @@ do
 	tp2:AddTextbox("Location name", "e.g. Base", function(txt) TP.SaveName = txt or "" end)
 	tp2:AddButton("Save Current Position", function()
 		local r = rootOf(lp)
-		if not r then say("Karakter bulunamadi", "error") return end
+		if not r then say("Character not found", "error") return end
 		local nm = TP.SaveName ~= "" and TP.SaveName or ("Spot " .. tostring(#saved + 1))
 		local p = r.Position
 		table.insert(saved, { name = nm, x = math.floor(p.X * 10) / 10, y = math.floor(p.Y * 10) / 10, z = math.floor(p.Z * 10) / 10 })
 		persist()
 		refreshSaved()
-		say(T_("Kaydedildi: ") .. nm)
+		say(T_("Saved: ") .. nm)
 	end)
 	local savedBox = tp2:AddContainer()
 	local savedEntries = {}
@@ -3548,7 +3582,7 @@ do
 		savedEntries = {}
 		locStrokes = {}
 		if #saved == 0 then
-			local e = label({ Text = "Kayitli konum yok", TextSize = 12, TextColor3 = T.dim, TextXAlignment = Enum.TextXAlignment.Center, Size = UDim2.new(1, 0, 0, 30) })
+			local e = label({ Text = "No saved locations", TextSize = 12, TextColor3 = T.dim, TextXAlignment = Enum.TextXAlignment.Center, Size = UDim2.new(1, 0, 0, 30) })
 			e.Parent = savedBox
 			table.insert(savedEntries, e)
 			return
@@ -3593,31 +3627,31 @@ do
 	tp3:AddButton("Teleport to Coordinates", function()
 		local nums = {}
 		for n in string.gmatch(TP.Coords, "-?%d+%.?%d*") do table.insert(nums, tonumber(n)) end
-		if #nums < 3 then say("3 sayi gir: x y z", "warn") return end
-		if goCF(CFrame.new(nums[1], nums[2], nums[3])) then say("Koordinata isinlandin") end
+		if #nums < 3 then say("Enter 3 numbers: x y z", "warn") return end
+		if goCF(CFrame.new(nums[1], nums[2], nums[3])) then say("Teleported to coordinates") end
 	end)
 	tp3:AddButton("Copy My Coordinates", function()
 		local r = rootOf(lp)
 		local clip = setclipboard or toclipboard
-		if not r then say("Karakter bulunamadi", "error") return end
+		if not r then say("Character not found", "error") return end
 		local p = r.Position
 		local txt = string.format("%.1f %.1f %.1f", p.X, p.Y, p.Z)
 		if clip then
 			pcall(clip, txt)
-			say(T_("Kopyalandi: ") .. txt)
+			say(T_("Copied: ") .. txt)
 		else
-			say(T_("Konum: ") .. txt, "warn")
+			say(T_("Location: ") .. txt, "warn")
 		end
 	end)
-	tp3:AddButton("Go Back (onceki konum)", function()
-		if not TP.Back then say("Onceki konum yok", "warn") return end
+	tp3:AddButton("Go Back (previous location)", function()
+		if not TP.Back then say("No previous location", "warn") return end
 		goCF(TP.Back, true)
-		say("Geri donuldu")
+		say("Went back")
 	end)
 	tp3:AddButton("Teleport to Spawn", function()
 		local sp = workspace:FindFirstChildWhichIsA("SpawnLocation", true)
-		if not sp then say("Spawn noktasi bulunamadi", "warn") return end
-		if goCF(sp.CFrame + Vector3.new(0, sp.Size.Y / 2, 0)) then say("Spawn noktasina isinlandin") end
+		if not sp then say("Spawn point not found", "warn") return end
+		if goCF(sp.CFrame + Vector3.new(0, sp.Size.Y / 2, 0)) then say("Teleported to spawn") end
 	end)
 
 	------------------------------------------------ AYARLAR
@@ -3626,7 +3660,7 @@ do
 	tp4:AddSlider("Smooth Duration (s)", 0.2, 6, 1.2, function(v) TP.Time = v end, 0.1)
 	tp4:AddSlider("Height Offset (studs)", 0, 20, 3, function(v) TP.Lift = v end, 0.5)
 	tp4:AddToggle("Click / Tap Teleport", false, function(on) TP.Click = on end)
-	tp4:AddLabel("PC: Ctrl basili tut + tikla. Mobil: ekrana dokun.")
+	tp4:AddLabel("PC: hold Ctrl + click. Mobile: tap the screen.")
 	local function rayHit(ray)
 		local ignore = {}
 		if lp.Character then table.insert(ignore, lp.Character) end
@@ -3718,6 +3752,7 @@ a1:AddToggle("Wall Check", false, function(on) Aim.WallCheck = on end)
 a1:AddToggle("Sticky Target", true, function(on) Aim.Sticky = on end)
 a1:AddToggle("Show FOV", Aim.ShowFOV, function(on) Aim.ShowFOV = on end)
 a1:AddColorPicker("FOV Color", Aim.FOVColor, function(c) Aim.FOVColor = c end)
+a1:AddToggle("FOV Rainbow", false, function(on) Aim.FOVRainbow = on end)
 
 local aTuning = AimTab:AddSection("Aim Tuning")
 aTuning:AddSlider("Smoothness (0 = direct)", 0, 95, 0, function(v) Aim.Smooth = v end)
@@ -3730,7 +3765,7 @@ if AIM_MOBILE then -- ekrandaki aim butonu ayarlari sadece telefonda gorunur
 	aBtn:AddToggle("Show Aim Button", true, function(on) Aim.ShowButton = on end)
 	aBtn:AddSlider("Button Size", 40, 110, Aim.ButtonSize, function(v) Aim.ButtonSize = v end, 2)
 	aBtn:AddButton("Reset Button Position", function() AimButton.Reset() end)
-	aBtn:AddLabel("Dokun: Toggle'da ac/kapat, Hold'da basili tut. Surukleyerek tasi.")
+	aBtn:AddLabel("Tap: toggles on/off in Toggle mode, hold in Hold mode. Drag to move.")
 end
 
 local a2 = AimTab:AddSection("Hitbox Integration")
@@ -3758,12 +3793,12 @@ s1:AddToggle("Rainbow Accent", false, function(on)
 		Aurora:SetAccent(savedAccent, false)
 	end
 end)
-s1:AddSlider("Menu Scale (Boyut)", 0.4, 1.5, ((UIS.TouchEnabled and not UIS.MouseEnabled) and 0.65 or 0.85), function(v)
+s1:AddSlider("Menu Scale (Size)", 0.4, 1.5, ((UIS.TouchEnabled and not UIS.MouseEnabled) and 0.65 or 0.85), function(v)
 	Aurora:SetMenuScale(v)
 end, 0.05)
 s1:AddButton("Reset Theme Colors", function()
 	Aurora:ResetTheme()
-	Aurora:Notify("Sifirlandi", "Tum tema renkleri ve arka planlar varsayilan ayarlara donduruldu.", 3, "success")
+	Aurora:Notify("Reset", "All theme colors and backgrounds were restored to defaults.", 3, "success")
 end)
 
 local sPack = Settings:AddSection("Theme Packs & Backgrounds")
@@ -3792,7 +3827,7 @@ do
 		GoldBlack = { "Gold", "Black" }, NeonPurple = { "Magenta", "Purple" }, Forest = { "Emerald", "Forest" }, Sunset = { "Orange", "Sunset" },
 		Ice = { "Sky", "Slate" }, Royal = { "Indigo", "Midnight" }, Coffee = { "Amber", "Coffee" }, Snow = { "Blue", "Light" },
 	}
-	sPack:AddDropdown("Theme Pack (renk + arka plan)", { "Blood", "Ocean", "Sakura", "Matrix", "GoldBlack", "NeonPurple", "Forest", "Sunset", "Ice", "Royal", "Coffee", "Snow" }, "Sec", function(o)
+	sPack:AddDropdown("Theme Pack (color + background)", { "Blood", "Ocean", "Sakura", "Matrix", "GoldBlack", "NeonPurple", "Forest", "Sunset", "Ice", "Royal", "Coffee", "Snow" }, "Sec", function(o)
 		local p = PACKS[o]
 		if not p then return end
 		Aurora:SetAccent(p[1], true)
@@ -3855,7 +3890,7 @@ do
 		if not canFile then
 			if not warnedNoFile then
 				warnedNoFile = true
-				Aurora:Notify("Config", "Dosya sistemi yok: kayitlar sadece bu oturumda kalir.", 5, "warn")
+				Aurora:Notify("Config", "No file system: saves last only for this session.", 5, "warn")
 			end
 			return false
 		end
@@ -3948,7 +3983,7 @@ do
 			applying = false
 			store.last = name
 			writeStore()
-			Aurora:Notify("Config yuklendi", name .. " - " .. n .. T_(" ayar uygulandi"), 3.5, "success")
+			Aurora:Notify("Config loaded", name .. " - " .. n .. T_(" settings applied"), 3.5, "success")
 		end)
 	end
 
@@ -3991,7 +4026,7 @@ do
 
 		lbl({ Text = name, Font = Enum.Font.GothamBold, TextSize = 14, TextTruncate = Enum.TextTruncate.AtEnd, Size = UDim2.new(1, -190, 0, 20), Position = UDim2.fromOffset(62, 12) }).Parent = r
 		lbl({
-			Text = string.format("%d ayar - %d acik - %s", prof.n or 0, prof.on or 0, os.date("%d.%m %H:%M", prof.saved or os.time())),
+			Text = string.format("%d settings - %d on - %s", prof.n or 0, prof.on or 0, os.date("%d.%m %H:%M", prof.saved or os.time())),
 			TextSize = 11, TextColor3 = T.dim, TextTruncate = Enum.TextTruncate.AtEnd, Size = UDim2.new(1, -190, 0, 16), Position = UDim2.fromOffset(62, 34),
 		}).Parent = r
 
@@ -4030,7 +4065,7 @@ do
 				store.last = best
 			end
 			writeStore()
-			Aurora:Notify("Config silindi", name, 3, "warn")
+			Aurora:Notify("Config deleted", name, 3, "warn")
 			refresh()
 		end)
 		return r
@@ -4038,7 +4073,7 @@ do
 
 	------------------------------------------------ bolum icerigi
 	local nameText = ""
-	sCfg:AddTextbox("Config name", "ornek: ESP acik", function(txt) nameText = txt or "" end)
+	sCfg:AddTextbox("Config name", "e.g. ESP on", function(txt) nameText = txt or "" end)
 	sCfg:AddButton("Save Current UI", function()
 		local nm = string.sub((nameText:gsub("^%s+", ""):gsub("%s+$", "")), 1, 24)
 		if nm == "" then
@@ -4050,14 +4085,39 @@ do
 		store.profiles[nm] = { saved = os.time(), items = items, on = on, n = #items, theme = captureTheme() }
 		store.last = nm
 		writeStore()
-		Aurora:Notify("Config kaydedildi", nm .. " - " .. #items .. T_(" ayar, ") .. on .. T_(" acik ozellik"), 3.5, "success")
+		Aurora:Notify("Config saved", nm .. " - " .. #items .. T_(" settings, ") .. on .. T_(" features on"), 3.5, "success")
+		refresh()
+	end)
+	local owArm, owTok = nil, 0
+	sCfg:AddButton("Overwrite Selected Config", function()
+		local nm = selCfg
+		if not nm or not store.profiles[nm] then
+			Aurora:Notify("Config", "Select a config from the list first", 3, "warn")
+			return
+		end
+		-- yanlislikla ustune yazmamak icin: ilk basista uyar, 4 sn icinde tekrar basinca kaydet
+		if owArm ~= nm then
+			owArm = nm
+			owTok = owTok + 1
+			local my = owTok
+			Aurora:Notify("Are you sure?", nm .. " - press again to confirm", 4, "warn")
+			task.delay(4, function() if owTok == my then owArm = nil end end)
+			return
+		end
+		owArm = nil
+		owTok = owTok + 1
+		local items, on = capture()
+		store.profiles[nm] = { saved = os.time(), items = items, on = on, n = #items, theme = captureTheme() }
+		store.last = nm
+		writeStore()
+		Aurora:Notify("Config updated", nm .. " - " .. #items .. T_(" settings, ") .. on .. T_(" features on"), 3.5, "success")
 		refresh()
 	end)
 	sCfg:AddButton("Load Last Config", function()
 		if store.last and store.profiles[store.last] then
 			applyProfile(store.last)
 		else
-			Aurora:Notify("Config", "Kayitli config yok.", 3, "warn")
+			Aurora:Notify("Config", "No saved config.", 3, "warn")
 		end
 	end)
 	local askToggle = sCfg:AddToggle("Ask to load on open", store.ask, function(on)
@@ -4106,13 +4166,15 @@ do
 		table.sort(names, function(a, b) return (store.profiles[a].saved or 0) > (store.profiles[b].saved or 0) end)
 		countL.Text = tostring(#names)
 		if #names == 0 then
-			lbl({ Text = T_("Henuz kayitli config yok. Ozellikleri ac (ornek: ESP), isim yaz ve 'Save Current UI'a bas."), TextSize = 11, TextColor3 = T.dim, TextWrapped = true, Size = UDim2.new(1, -20, 0, 36), Position = UDim2.fromOffset(10, 0) }).Parent = listBox
+			lbl({ Text = T_("No saved config yet. Turn on some features (e.g. ESP), type a name and press 'Save Current UI'."), TextSize = 11, TextColor3 = T.dim, TextWrapped = true, Size = UDim2.new(1, -20, 0, 36), Position = UDim2.fromOffset(10, 0) }).Parent = listBox
 			return
 		end
 		for i, n in ipairs(names) do
 			local rf = makeRow(i, n, store.profiles[n])
 			rf.Parent = listBox
 		end
+		if selCfg and not store.profiles[selCfg] then selCfg = nil end
+		paintCfg()
 	end
 	-- listBox bos satir boyu 0: otomatik boyut icin etiket yuksekligi
 	refresh()
@@ -4144,14 +4206,14 @@ do
 		icw.Parent = band
 		band.Parent = card
 
-		lbl({ Text = "KAYITLI CONFIG BULUNDU", Font = Enum.Font.GothamBlack, TextSize = 15, TextXAlignment = Enum.TextXAlignment.Center, Size = UDim2.new(1, 0, 0, 20), Position = UDim2.fromOffset(0, 104) }).Parent = card
-		lbl({ Text = "Bu config'i simdi yuklemek istiyor musunuz?", TextSize = 12, TextColor3 = T.sub, TextXAlignment = Enum.TextXAlignment.Center, Size = UDim2.new(1, -24, 0, 16), Position = UDim2.fromOffset(12, 127) }).Parent = card
+		lbl({ Text = "SAVED CONFIG FOUND", Font = Enum.Font.GothamBlack, TextSize = 15, TextXAlignment = Enum.TextXAlignment.Center, Size = UDim2.new(1, 0, 0, 20), Position = UDim2.fromOffset(0, 104) }).Parent = card
+		lbl({ Text = "Do you want to load this config now?", TextSize = 12, TextColor3 = T.sub, TextXAlignment = Enum.TextXAlignment.Center, Size = UDim2.new(1, -24, 0, 16), Position = UDim2.fromOffset(12, 127) }).Parent = card
 
 		local chip = new("Frame", { Size = UDim2.new(1, -40, 0, 50), Position = UDim2.fromOffset(20, 152), BackgroundColor3 = T.row, BorderSizePixel = 0 }, { corner(12), stroke(T.line, 1, 0.4) })
 		local dot = new("Frame", { Size = UDim2.fromOffset(8, 8), Position = UDim2.fromOffset(14, 21), BackgroundColor3 = accent, BorderSizePixel = 0 }, { corner(4) })
 		dot.Parent = chip
 		lbl({ Text = name, Font = Enum.Font.GothamBold, TextSize = 14, TextTruncate = Enum.TextTruncate.AtEnd, Size = UDim2.new(1, -46, 0, 18), Position = UDim2.fromOffset(32, 8) }).Parent = chip
-		lbl({ Text = string.format("%d ayar - %d acik - %s", prof.n or 0, prof.on or 0, os.date("%d.%m %H:%M", prof.saved or os.time())), TextSize = 11, TextColor3 = T.dim, TextTruncate = Enum.TextTruncate.AtEnd, Size = UDim2.new(1, -46, 0, 16), Position = UDim2.fromOffset(32, 27) }).Parent = chip
+		lbl({ Text = string.format("%d settings - %d on - %s", prof.n or 0, prof.on or 0, os.date("%d.%m %H:%M", prof.saved or os.time())), TextSize = 11, TextColor3 = T.dim, TextTruncate = Enum.TextTruncate.AtEnd, Size = UDim2.new(1, -46, 0, 16), Position = UDim2.fromOffset(32, 27) }).Parent = chip
 		chip.Parent = card
 
 		local closed = false
@@ -4186,15 +4248,15 @@ do
 			b.MouseButton1Click:Connect(cb)
 			b.Parent = card
 		end
-		mkBtn(T_("EVET, YUKLE"), 20, true, function() close(function() applyProfile(name) end) end)
-		mkBtn(T_("HAYIR"), 180, false, function() close() end)
+		mkBtn(T_("YES, LOAD"), 20, true, function() close(function() applyProfile(name) end) end)
+		mkBtn(T_("NO"), 180, false, function() close() end)
 
-		local never = new("TextButton", { Text = T_("Bir daha sorma"), Size = UDim2.new(1, 0, 0, 16), Position = UDim2.fromOffset(0, 254), BackgroundTransparency = 1, Font = Enum.Font.GothamMedium, TextSize = 11, TextColor3 = T.dim, AutoButtonColor = false })
+		local never = new("TextButton", { Text = T_("Don't ask again"), Size = UDim2.new(1, 0, 0, 16), Position = UDim2.fromOffset(0, 254), BackgroundTransparency = 1, Font = Enum.Font.GothamMedium, TextSize = 11, TextColor3 = T.dim, AutoButtonColor = false })
 		never.MouseEnter:Connect(function() tween(never, 0.15, { TextColor3 = T.text }) end)
 		never.MouseLeave:Connect(function() tween(never, 0.15, { TextColor3 = T.dim }) end)
 		never.MouseButton1Click:Connect(function()
 			askToggle.Set(false)
-			Aurora:Notify("Config", "Acilista sorma kapatildi. Settings > Config'ten tekrar acabilirsin.", 4)
+			Aurora:Notify("Config", "Ask-on-open is off. You can turn it on again in Settings > Config.", 4)
 			close()
 		end)
 		never.Parent = card
