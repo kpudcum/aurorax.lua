@@ -1760,6 +1760,7 @@ local ESP = {
 	HealthText = false,
 	HeldItem = false,
 	Inventory = false,
+	InvMax = 4,
 	TeamColor = false,
 	VisColor = false,
 	Rainbow = false,
@@ -1899,6 +1900,100 @@ local function buildArrow(p)
 	return {list = {t}, label = t}
 end
 
+local INV = {MAXROWS = 10, GRAY = Color3.fromRGB(150, 156, 172)}
+
+function INV.build(p)
+	local card = newFrame(p, 5, {BackgroundColor3 = Color3.fromRGB(12, 14, 22), BackgroundTransparency = .16})
+	esp_make('UICorner', {CornerRadius = UDim.new(0, 6)}, card)
+	local st = esp_make('UIStroke', {Color = WHITE, Thickness = 1, Transparency = .3}, card)
+	local bar = esp_make('Frame', {BackgroundColor3 = WHITE, BorderSizePixel = 0, ZIndex = 6, Active = false, Position = UDim2.fromOffset(3, 4), Size = UDim2.fromOffset(2, 10)}, card)
+	esp_make('UICorner', {CornerRadius = UDim.new(1, 0)}, bar)
+	local tags, names = {}, {}
+	for i = 1, INV.MAXROWS do
+		local tg = makeLabel(card, 7); tg.TextXAlignment = Enum.TextXAlignment.Left; tg.Font = Enum.Font.GothamBlack
+		local nm = makeLabel(card, 7); nm.TextXAlignment = Enum.TextXAlignment.Left; nm.Font = Enum.Font.GothamMedium
+		tags[i], names[i] = tg, nm
+	end
+	return {list = {card}, card = card, st = st, bar = bar, tags = tags, names = names}
+end
+
+function INV.row(g, n, tag, txt, c, ts, ih, tagW, dim)
+	local tg, nm = g.tags[n], g.names[n]
+	local yy = 3 + (n - 1) * ih
+	tg.Position = UDim2.fromOffset(9, yy); tg.Size = UDim2.fromOffset(tagW, ih)
+	tg.TextSize = math.max(7, ts - 3); tg.TextColor3 = c
+	if tg.Text ~= tag then tg.Text = tag end
+	nm.Position = UDim2.fromOffset(9 + tagW, yy); nm.Size = UDim2.new(1, -(13 + tagW), 0, ih)
+	nm.TextSize = ts - 1; nm.TextColor3 = dim and INV.GRAY or WHITE
+	if nm.Text ~= txt then nm.Text = txt end
+	if not tg.Visible then tg.Visible = true end
+	if not nm.Visible then nm.Visible = true end
+end
+
+function INV.scan(model, player)
+	local held, count, order = nil, {}, {}
+	local function sc(c, isChar)
+		if not c then return end
+		for _, t in ipairs(c:GetChildren()) do
+			if t:IsA('Tool') then
+				if isChar and not held then held = t.Name end
+				if not count[t.Name] then count[t.Name] = 0; order[#order + 1] = t.Name end
+				count[t.Name] = count[t.Name] + 1
+			end
+		end
+	end
+	sc(model, true)
+	if player then sc(player:FindFirstChildOfClass('Backpack'), false) end
+	local names = {}
+	for i = 1, math.min(24, #order) do
+		local n = order[i]
+		names[i] = count[n] > 1 and (n .. ' x' .. count[n]) or n
+	end
+	return held, names, #order
+end
+
+function INV.draw(d, g, x, y, ts, far, c)
+	local ih = ts + 3
+	local tagW = math.floor(ts * 3.6)
+	local tr = Lang == 'tr'
+	local n = 0
+	if ESP.HeldItem then
+		n = n + 1
+		local hn = d.heldName
+		INV.row(g, n, tr and 'ELDE' or 'HELD', hn or (tr and 'Bos' or 'Empty'), c, ts, ih, tagW, not hn)
+	end
+	if ESP.Inventory and not far then
+		local names = d.invNames
+		local total = #names
+		local cap = math.min(ESP.InvMax, total)
+		if total == 0 then
+			n = n + 1
+			INV.row(g, n, tr and 'CANTA' or 'BAG', tr and 'Bos' or 'Empty', c, ts, ih, tagW, true)
+		end
+		for i = 1, cap do
+			n = n + 1
+			INV.row(g, n, i == 1 and (tr and 'CANTA' or 'BAG') or '', names[i], c, ts, ih, tagW, false)
+		end
+		if d.invTotal > cap then
+			n = n + 1
+			INV.row(g, n, '', '+' .. (d.invTotal - cap) .. (tr and ' daha' or ' more'), c, ts, ih, tagW, true)
+		end
+	end
+	for i = n + 1, INV.MAXROWS do
+		local tg, nm = g.tags[i], g.names[i]
+		if tg.Visible then tg.Visible = false end
+		if nm.Visible then nm.Visible = false end
+	end
+	if n == 0 then show(g, false) return 0 end
+	local cw = math.clamp(math.floor(ts * 13), 104, 230)
+	g.card.Size = UDim2.fromOffset(cw, n * ih + 6)
+	g.card.Position = UDim2.fromOffset(x - math.floor(cw * .5), y)
+	g.st.Color = c; g.bar.BackgroundColor3 = c
+	g.bar.Size = UDim2.fromOffset(2, n * ih - 2)
+	show(g, true)
+	return n * ih + 8
+end
+
 local function grp(d, key, build)
 	local g = d.g[key]
 	if not g then g = build(d.gui); d.g[key] = g end
@@ -1936,26 +2031,6 @@ local function buildBones(d)
 	d.bp = out
 end
 
-local function toolInfo(model, player)
-	local held, count, order = 'Yok', {}, {}
-	local function scan(c)
-		if not c then return end
-		for _, t in ipairs(c:GetChildren()) do
-			if t:IsA('Tool') then
-				if c == model and held == 'Yok' then held = t.Name end
-				if not count[t.Name] then count[t.Name] = 0; order[#order + 1] = t.Name end
-				count[t.Name] = count[t.Name] + 1
-			end
-		end
-	end
-	scan(model)
-	if player then scan(player:FindFirstChildOfClass('Backpack')) end
-	local parts = {}
-	for i = 1, math.min(4, #order) do local n = order[i]; parts[#parts + 1] = count[n] > 1 and (n .. ' x' .. count[n]) or n end
-	if #order > 4 then parts[#parts + 1] = '+' .. (#order - 4) end
-	return held, #parts > 0 and table.concat(parts, ', ') or 'Bos'
-end
-
 local function canSee(d, cam)
 	local o = cam.CFrame.Position
 	local parts = {d.root, d.model:FindFirstChild('Head')}
@@ -1973,7 +2048,7 @@ local function createESP(model, player)
 	local hm = model:FindFirstChildOfClass('Humanoid')
 	local rt = model:FindFirstChild('HumanoidRootPart') or model.PrimaryPart or model:FindFirstChild('Head')
 	if not hm or not rt or not rt:IsA('BasePart') then return nil end
-	local d = {model = model, player = player, hum = hm, root = rt, g = {}, active = false, visible = true, dist = 0, color = ESP.Color, hp = 1, hpNum = 0, nameText = '', distText = '', itemText = '', itemLines = 0, mStamp = 0, iStamp = 0, hlOK = true, up = 3, down = 3, ratio = .55}
+	local d = {model = model, player = player, hum = hm, root = rt, g = {}, active = false, visible = true, dist = 0, color = ESP.Color, hp = 1, hpNum = 0, nameText = '', distText = '', invNames = {}, invTotal = 0, mStamp = 0, iStamp = 0, hlOK = true, up = 3, down = 3, ratio = .55}
 	d.gui = esp_make('Frame', {BackgroundTransparency = 1, BorderSizePixel = 0, Size = UDim2.fromScale(1, 1), Active = false, ZIndex = 1}, overlay)
 	d.carrier = esp_make('Part', {Name = 'KPUD_ESP_BOX', Anchored = true, CanCollide = false, CanTouch = false, CanQuery = false, CastShadow = false, Transparency = 1, Size = Vector3.new(4, 6, 2)}, world)
 	d.box3 = esp_make('SelectionBox', {Name = 'KPUD_ESP_3D', Adornee = d.carrier, Color3 = ESP.Color, SurfaceTransparency = 1, LineThickness = .04, Visible = false}, world)
@@ -2053,14 +2128,8 @@ local function slowESP()
 		if needItems then
 			if now - d.iStamp > .5 then
 				d.iStamp = now
-				local held, inv = toolInfo(model, player)
-				local lines = {}
-				if ESP.HeldItem then lines[#lines + 1] = 'ELDE: ' .. held end
-				if ESP.Inventory then lines[#lines + 1] = 'CANTA: ' .. inv end
-				d.itemText = table.concat(lines, '\n'); d.itemLines = #lines
+				d.heldName, d.invNames, d.invTotal = INV.scan(model, player)
 			end
-		else
-			d.itemText = ''; d.itemLines = 0
 		end
 	end
 
@@ -2200,6 +2269,13 @@ local function drawESP(d, cam, camCF)
 		show(g, true); by = by + ts + 1
 	else
 		show(d.g.dist, false)
+	end
+
+	if (ESP.HeldItem or ESP.Inventory) and h >= 20 then
+		local g = grp(d, 'inv', INV.build)
+		INV.draw(d, g, mx, by + 2, ts, far, c)
+	else
+		show(d.g.inv, false)
 	end
 
 	if ESP.Skeleton and d.dist <= 350 and h >= 34 and d.bp then
@@ -2731,7 +2807,7 @@ gui.Destroying:Connect(function()
 	for plr, rec in pairs(records) do pcall(restoreAll, rec) end
 end)
 
-local Window = Aurora:CreateWindow("Aurora X", "v2.0 - Ultimate Edition")
+local Window = Aurora:CreateWindow("Aurora X", "v2.0 - Premium Edition")
 
 -- 1. HOME SEKME
 local Home = Window:AddTab("Home", "o")
@@ -3287,6 +3363,11 @@ e3:AddDropdown("Tracer From", { "Bottom", "Middle", "Top" }, "Bottom", function(
 end)
 e3:AddToggle("Arrows", false, function(on) ESP.Arrows = on end)
 e3:AddToggle("Skeleton", false, function(on) ESP.Skeleton = on end)
+
+local eInv = ESPTab:AddSection("Inventory & Held Item")
+eInv:AddToggle("Held Item", false, function(on) ESP.HeldItem = on end)
+eInv:AddToggle("Inventory", false, function(on) ESP.Inventory = on end)
+eInv:AddSlider("Max Items", 1, 8, 4, function(v) ESP.InvMax = math.floor(v) end)
 
 local e4 = ESPTab:AddSection("NPC ESP")
 e4:AddToggle("NPC Enabled", false, function(on)
