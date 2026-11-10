@@ -3399,8 +3399,11 @@ do
 			TextSize = 11, TextColor3 = T.dim, TextTruncate = Enum.TextTruncate.AtEnd, Size = UDim2.new(1, -190, 0, 16), Position = UDim2.fromOffset(62, 34),
 		}).Parent = r
 
-		local load = new("TextButton", { Text = "LOAD", Size = UDim2.fromOffset(58, 28), Position = UDim2.new(1, -130, 0.5, -14), BackgroundColor3 = WHITE, Font = Enum.Font.GothamBlack, TextSize = 11, TextColor3 = WHITE, AutoButtonColor = false, BorderSizePixel = 0 }, { corner(10) })
-		accentGrad(load, 0)
+		local load = new("TextButton", { Text = "", Size = UDim2.fromOffset(58, 28), Position = UDim2.new(1, -130, 0.5, -14), BackgroundTransparency = 1, AutoButtonColor = false, BorderSizePixel = 0 }, { corner(10) })
+		local loadFill = new("Frame", { Size = UDim2.fromScale(1, 1), BackgroundColor3 = WHITE, BorderSizePixel = 0, ZIndex = 1 }, { corner(10) })
+		accentGrad(loadFill, 0)
+		loadFill.Parent = load
+		lbl({ Text = "LOAD", Font = Enum.Font.GothamBlack, TextSize = 11, TextColor3 = WHITE, TextXAlignment = Enum.TextXAlignment.Center, Size = UDim2.fromScale(1, 1), ZIndex = 3 }).Parent = load
 		load.Parent = r
 		load.MouseButton1Click:Connect(function() applyProfile(name) end)
 
@@ -3464,7 +3467,26 @@ do
 		store.ask = on
 		writeStore()
 	end)
-	local listBox = sCfg:AddContainer()
+	local cont = sCfg:AddContainer()
+	local head = new("TextButton", { Text = "", Size = UDim2.new(1, 0, 0, 42), BackgroundColor3 = T.row, BorderSizePixel = 0, AutoButtonColor = false, LayoutOrder = 0 }, { corner(10), stroke(T.line, 1, 0.5) })
+	onThemeChange(function(k, c) if k == "row" then head.BackgroundColor3 = c end end)
+	lbl({ Text = "Saved Configs", Font = Enum.Font.GothamBold, TextSize = 13, Size = UDim2.new(1, -110, 1, 0), Position = UDim2.fromOffset(14, 0) }).Parent = head
+	local countPill = new("Frame", { Size = UDim2.fromOffset(34, 22), Position = UDim2.new(1, -76, 0.5, -11), BackgroundColor3 = WHITE, BorderSizePixel = 0 }, { corner(11) })
+	accentGrad(countPill, 0)
+	local countL = lbl({ Text = "0", Font = Enum.Font.GothamBlack, TextSize = 12, TextColor3 = WHITE, TextXAlignment = Enum.TextXAlignment.Center, Size = UDim2.fromScale(1, 1), ZIndex = 2 })
+	countL.Parent = countPill
+	countPill.Parent = head
+	local arrowL = lbl({ Text = "v", TextSize = 13, TextColor3 = T.dim, TextXAlignment = Enum.TextXAlignment.Center, Size = UDim2.fromOffset(30, 42), Position = UDim2.new(1, -38, 0, 0) })
+	arrowL.Parent = head
+	head.Parent = cont
+	local listBox = new("Frame", { Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1, LayoutOrder = 1, Visible = false }, { list(6) })
+	listBox.Parent = cont
+	local listOpen = false
+	head.MouseButton1Click:Connect(function()
+		listOpen = not listOpen
+		listBox.Visible = listOpen
+		tween(arrowL, 0.2, { Rotation = listOpen and 180 or 0 })
+	end)
 
 	onThemeChange(function(k)
 		if k == "row" or k == "text" or k == "sub" or k == "dim" or k == "bg0" or k == "err" then
@@ -3485,6 +3507,7 @@ do
 		local names = {}
 		for n in pairs(store.profiles) do table.insert(names, n) end
 		table.sort(names, function(a, b) return (store.profiles[a].saved or 0) > (store.profiles[b].saved or 0) end)
+		countL.Text = tostring(#names)
 		if #names == 0 then
 			lbl({ Text = "Henuz kayitli config yok. Ozellikleri ac (ornek: ESP), isim yaz ve 'Save Current UI'a bas.", TextSize = 11, TextColor3 = T.dim, TextWrapped = true, Size = UDim2.new(1, -20, 0, 36), Position = UDim2.fromOffset(10, 0) }).Parent = listBox
 			return
@@ -3547,12 +3570,28 @@ do
 
 		local function mkBtn(text, x, primary, cb)
 			local b = new("TextButton", {
-				Text = text, Size = UDim2.fromOffset(150, 38), Position = UDim2.fromOffset(x, 214), Font = Enum.Font.GothamBlack, TextSize = 13,
-				AutoButtonColor = false, BorderSizePixel = 0, BackgroundColor3 = primary and WHITE or T.row, TextColor3 = primary and WHITE or T.text,
+				Text = "", Size = UDim2.fromOffset(150, 38), Position = UDim2.fromOffset(x, 214),
+				AutoButtonColor = false, BorderSizePixel = 0, BackgroundColor3 = T.row, BackgroundTransparency = primary and 1 or 0,
 			}, { corner(12) })
 			local bs = new("UIScale", { Scale = 1 })
 			bs.Parent = b
-			if primary then accentGrad(b, 0) else stroke(T.line, 1, 0.2).Parent = b end
+			local txt = lbl({ Text = text, Font = Enum.Font.GothamBlack, TextSize = 13, TextColor3 = primary and WHITE or accent, TextXAlignment = Enum.TextXAlignment.Center, Size = UDim2.fromScale(1, 1), ZIndex = 3 })
+			if primary then
+				-- EVET: tema renginde gradient dolgu (gradient yaziyi boyamasin diye ayri kutu)
+				local fill = new("Frame", { Size = UDim2.fromScale(1, 1), BackgroundColor3 = WHITE, BorderSizePixel = 0, ZIndex = 1 }, { corner(12) })
+				accentGrad(fill, 0)
+				fill.Parent = b
+				txt.Parent = b
+			else
+				-- HAYIR: tema renginde cerceve + yazi
+				txt.Parent = b
+				local bst = stroke(accent, 1.6, 0.1)
+				bst.Parent = b
+				onAccent(function(a)
+					if bst.Parent then bst.Color = a end
+					if txt.Parent then txt.TextColor3 = a end
+				end)
+			end
 			b.MouseEnter:Connect(function() tween(bs, 0.12, { Scale = 1.05 }) end)
 			b.MouseLeave:Connect(function() tween(bs, 0.12, { Scale = 1 }) end)
 			b.MouseButton1Click:Connect(cb)
