@@ -926,7 +926,7 @@ function Aurora:CreateWindow(titleText, subtitle)
 	-- Sekme simgeleri: emoji/font yok, tamamen Frame ile cizilir ve tema/vurgu rengine uyar.
 	-- Sekme adina gore secilir (adi icinde anahtar kelime gecenler de eslesir).
 	local ICON_KEYS = {
-		{ "home", "home" }, { "player", "player" }, { "visual", "visuals" }, { "esp", "esp" },
+		{ "home", "home" }, { "player", "player" }, { "server", "server" }, { "visual", "visuals" }, { "esp", "esp" },
 		{ "aim", "aimbot" }, { "hit", "hitbox" }, { "setting", "settings" }, { "config", "settings" }, { "teleport", "teleport" },
 	}
 	local function tabIconKind(tabName)
@@ -1001,6 +1001,9 @@ function Aurora:CreateWindow(titleText, subtitle)
 		elseif kind == "settings" then
 			rect(2, 3, 16, 2, 1, 0, 0.55) rect(2, 9, 16, 2, 1, 0, 0.55) rect(2, 15, 16, 2, 1, 0, 0.55)
 			rect(10, 1, 6, 6, "c") rect(4, 7, 6, 6, "c") rect(11, 13, 6, 6, "c")
+		elseif kind == "server" then
+			rect(1, 1, 18, 5, 1.5, 0, 0.55) rect(1, 7.5, 18, 5, 1.5, 0, 0.55) rect(1, 14, 18, 5, 1.5, 0, 0.55)
+			rect(15.3, 2.5, 2, 2, "c") rect(15.3, 9, 2, 2, "c") rect(15.3, 15.5, 2, 2, "c")
 		end
 
 		box.Parent = parent
@@ -3114,39 +3117,9 @@ p2:AddButton("Reset Character", function()
 	if h then h.Health = 0 end
 end)
 
-local p3 = Player:AddSection("Utility")
-do
-	local VirtualUser = game:GetService("VirtualUser")
-	local afkConn = nil
-	local afkOn = false
-	local function poke()
-		pcall(function()
-			VirtualUser:CaptureController()
-			VirtualUser:ClickButton2(Vector2.new(0, 0))
-		end)
-	end
-	local function afkStop()
-		afkOn = false
-		if afkConn then afkConn:Disconnect() afkConn = nil end
-	end
-	gui.Destroying:Connect(afkStop)
-	p3:AddToggle("Anti AFK", false, function(on)
-		afkStop()
-		if not on then return end
-		afkOn = true
-		afkConn = lp.Idled:Connect(poke)
-		Aurora:Notify("Anti AFK", "Aktif: AFK atilmayacaksin", 2.5, "success")
-		task.spawn(function()
-			-- Idled tetiklenmese bile 2 dakikada bir hareket gonder
-			while afkOn do
-				task.wait(120)
-				if afkOn then poke() end
-			end
-		end)
-	end)
-end
-
-local p4 = Player:AddSection("Server")
+-- 3. SERVER SEKME
+local ServerTab = Window:AddTab("Server", "o")
+local sv1 = ServerTab:AddSection("Connection")
 do
 	local TeleportService = game:GetService("TeleportService")
 	local HttpService = game:GetService("HttpService")
@@ -3164,7 +3137,7 @@ do
 		return nil
 	end
 
-	p4:AddButton("Rejoin", function()
+	sv1:AddButton("Rejoin", function()
 		if busy then return end
 		busy = true
 		say("Ayni sunucuya yeniden baglaniliyor...", "warn")
@@ -3208,11 +3181,43 @@ do
 			task.delay(6, function() busy = false end)
 		end)
 	end
-	p4:AddButton("Server Hop (rastgele)", function() hop(false) end)
-	p4:AddButton("Server Hop (en bos sunucu)", function() hop(true) end)
+	sv1:AddButton("Server Hop (rastgele)", function() hop(false) end)
+	sv1:AddButton("Server Hop (en bos sunucu)", function() hop(true) end)
 end
 
--- 3. VISUALS SEKME
+local sv2 = ServerTab:AddSection("Utility")
+do
+	local VirtualUser = game:GetService("VirtualUser")
+	local afkConn = nil
+	local afkOn = false
+	local function poke()
+		pcall(function()
+			VirtualUser:CaptureController()
+			VirtualUser:ClickButton2(Vector2.new(0, 0))
+		end)
+	end
+	local function afkStop()
+		afkOn = false
+		if afkConn then afkConn:Disconnect() afkConn = nil end
+	end
+	gui.Destroying:Connect(afkStop)
+	sv2:AddToggle("Anti AFK", false, function(on)
+		afkStop()
+		if not on then return end
+		afkOn = true
+		afkConn = lp.Idled:Connect(poke)
+		Aurora:Notify("Anti AFK", "Aktif: AFK atilmayacaksin", 2.5, "success")
+		task.spawn(function()
+			-- Idled tetiklenmese bile 2 dakikada bir hareket gonder
+			while afkOn do
+				task.wait(120)
+				if afkOn then poke() end
+			end
+		end)
+	end)
+end
+
+-- 4. VISUALS SEKME
 local Visuals = Window:AddTab("Visuals", "o")
 local v1 = Visuals:AddSection("Camera & Lighting")
 v1:AddSlider("Field of View", 40, 120, 70, function(v) workspace.CurrentCamera.FieldOfView = v end)
@@ -3580,7 +3585,7 @@ do
 	end))
 end
 
--- 4. ESP SEKME
+-- 5. ESP SEKME
 local ESPTab = Window:AddTab("ESP", "o")
 local e1 = ESPTab:AddSection("Player ESP")
 e1:AddToggle("Enabled", false, function(on) ESP.Player = on end)
@@ -3624,7 +3629,7 @@ e5:AddColorPicker("ESP Color", ESP.Color, function(c) ESP.Color = c end)
 local TimeDate = ESPTab:AddSection("Time & Date on ESP")
 TimeDate:AddToggle("Rainbow Color", false, function(on) ESP.Rainbow = on end)
 
--- 5. AIMBOT & HITBOX SEKME
+-- 6. AIMBOT & HITBOX SEKME
 local AimTab = Window:AddTab("Aimbot", "o")
 local a1 = AimTab:AddSection("Aimbot Settings")
 a1:AddToggle("Enable Aimbot", false, function(on) Aim.Enabled = on end)
@@ -3676,7 +3681,7 @@ a2:AddSlider("Transparency", 0, 1, 0.5, function(v) Hit.Transparency = v end, 0.
 a2:AddColorPicker("Hitbox Color", Hit.Color, function(c) Hit.Color = c end)
 a2:AddToggle("No Collide", false, function(on) Hit.NoCollide = on end)
 
--- 6. SETTINGS SEKME
+-- 7. SETTINGS SEKME
 local Settings = Window:AddTab("Settings", "o")
 local s1 = Settings:AddSection("Appearance & Scale")
 s1:AddDropdown("Theme", { "Violet", "Ocean", "Mint", "Rose", "Amber", "Crimson", "Red", "Orange", "Gold", "Lime", "Emerald", "Teal", "Cyan", "Sky", "Blue", "Indigo", "Purple", "Magenta", "Pink", "Silver", "White" }, "Violet", function(o) Aurora:SetAccent(o, true) end)
