@@ -359,8 +359,16 @@ function Aurora:CreateWindow(titleText, subtitle)
 		return math.max(0.4, math.min(3, s))
 	end
 
+	-- slider surukleme sirasinda her harekette tum arayuzu yeniden olceklemek takiliyordu (ve slider'in kendisi de oynuyordu):
+	-- deger kisa bir duraklamadan sonra tek seferde, yumusak bir gecisle uygulanir
+	local scaleTok = 0
 	function Aurora:SetMenuScale(scaleVal)
-		uiscale.Scale = math.clamp(scaleVal, 0.4, 1.5)
+		local target = math.clamp(scaleVal, 0.4, 1.5)
+		scaleTok = scaleTok + 1
+		local my = scaleTok
+		task.delay(0.12, function()
+			if my == scaleTok and uiscale.Parent then tween(uiscale, 0.18, { Scale = target }, Enum.EasingStyle.Quad) end
+		end)
 	end
 	function Aurora:GetMenuScale()
 		return uiscale.Scale
@@ -473,7 +481,9 @@ function Aurora:CreateWindow(titleText, subtitle)
 	sideDivider.Parent = win
 	onThemeChange(function(k, c) if k == "line" then sideDivider.BackgroundColor3 = c end end)
 
-	local tabList = new("Frame", { Size = UDim2.new(1, 0, 1, -78), BackgroundTransparency = 1 }, { pad(12, 14, 12, 0), list(4) })
+	-- sekme sayisi artinca profil kartinin altina girmesin: kaydirilabilir liste, profil kartindan once biter
+	local tabList = new("ScrollingFrame", { Size = UDim2.new(1, 0, 1, -82), BackgroundTransparency = 1, BorderSizePixel = 0, ScrollBarThickness = 0, ScrollingDirection = Enum.ScrollingDirection.Y,
+		CanvasSize = UDim2.new(), AutomaticCanvasSize = Enum.AutomaticSize.Y, ClipsDescendants = true, ElasticBehavior = Enum.ElasticBehavior.Never }, { pad(12, 10, 12, 8), list(4) })
 	tabList.Parent = side
 
 	local prof = new("Frame", { Size = UDim2.new(1, -20, 0, 56), Position = UDim2.new(0, 10, 1, -66), BackgroundColor3 = T.card, BorderSizePixel = 0 }, { corner(14), stroke(T.line, 1, 0.3) })
