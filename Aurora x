@@ -3124,6 +3124,7 @@ gui.Destroying:Connect(function()
 	pcall(function() RunService:UnbindFromRenderStep('KPUD_PURE_ESP_RENDER') end)
 	pcall(function() RunService:UnbindFromRenderStep('AimbotUI_Step') end)
 	pcall(function() RunService:UnbindFromRenderStep('HitboxUI_Step') end)
+	pcall(function() RunService:UnbindFromRenderStep('AuroraFovLock') end)
 	pcall(clearAllESP)
 	pcall(SkyAPI.Reset)
 	pcall(function() world:Destroy() end)
@@ -3410,10 +3411,45 @@ do
 	end)
 end
 
+-- FOV KILIDI: kosma, nisan alma, silah/durbun gibi oyun scriptleri FOV'u degistirse bile secilen deger geri yazilir
+local FovLock = { On = true, Value = nil }
+do
+	local boundCam, conn = nil, nil
+	local function hook(cam)
+		if conn then conn:Disconnect() conn = nil end
+		boundCam = cam
+		if not cam then return end
+		-- oyun FOV'u her degistirdiginde aninda geri yaz (cizimden once)
+		conn = cam:GetPropertyChangedSignal("FieldOfView"):Connect(function()
+			if FovLock.On and FovLock.Value and boundCam and boundCam.FieldOfView ~= FovLock.Value then
+				boundCam.FieldOfView = FovLock.Value
+			end
+		end)
+	end
+	hook(workspace.CurrentCamera)
+	table.insert(conns, workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(function() hook(workspace.CurrentCamera) end))
+	pcall(function() RunService:UnbindFromRenderStep("AuroraFovLock") end)
+	-- en son calisan render adimi: oyunun kamera scriptlerinden sonra bir kez daha uygula
+	RunService:BindToRenderStep("AuroraFovLock", Enum.RenderPriority.Last.Value, function()
+		local cam = workspace.CurrentCamera
+		if cam ~= boundCam then hook(cam) end
+		if FovLock.On and FovLock.Value and cam and cam.FieldOfView ~= FovLock.Value then
+			cam.FieldOfView = FovLock.Value
+		end
+	end)
+end
+
 -- 4. VISUALS SEKME
 local Visuals = Window:AddTab("Visuals", "o")
 local v1 = Visuals:AddSection("Camera & Lighting")
-v1:AddSlider("Field of View", 40, 120, 70, function(v) workspace.CurrentCamera.FieldOfView = v end)
+v1:AddSlider("Field of View", 40, 120, 70, function(v)
+	FovLock.Value = v
+	pcall(function() workspace.CurrentCamera.FieldOfView = v end)
+end)
+v1:AddToggle("FOV Lock (anti-reset)", true, function(on)
+	FovLock.On = on
+	if on and FovLock.Value then pcall(function() workspace.CurrentCamera.FieldOfView = FovLock.Value end) end
+end)
 v1:AddDropdown("Time of day", { "Morning", "Noon", "Evening", "Night" }, "Noon", function(o)
 	local times = { Morning = 7, Noon = 14, Evening = 18, Night = 0 }
 	enforcedClockTime = times[o] or 14
