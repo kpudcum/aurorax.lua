@@ -1631,6 +1631,9 @@ local SkyAPI = (function()
 			fx = { rate = 40, c1 = C(255, 170, 40), c2 = C(255, 60, 10), size = 0.35, speed = 6, life = 6, acc = Vector3.new(1, 0, 0), light = 1, tr = 0.1, spread = 35, up = true } },
 	}
 
+	-- varsayilan mavi Roblox skybox'i hicbir gokyuzunde gorunmesin: tum renk atmosfer + bulut/nebula katmanlarindan gelir
+	for _, pr in pairs(PRESETS) do pr.blank = true end
+
 	-- Her gokyuzu icin: bulut (Clouds), gokyuzu yildiz/nebula katmani (buyuk parcacik dokusu), gunes/ay boyutu
 	local DETAIL = {
 		Space = { cover = 0, den = 0, col = C(255, 255, 255), c1 = C(110, 60, 255), c2 = C(255, 70, 200), rate = 0.7, size = 380, tr = 0.86, light = 1, h = 650, moon = 28 },
@@ -1845,8 +1848,8 @@ local SkyAPI = (function()
 			enforcedClockTime = nil
 		end
 		local a = ensure("Atmosphere", "AuroraSky_Atmo")
-		a.Density = SKY.over.dens or p.atmo.d
-		a.Offset = 0
+		a.Density = SKY.over.dens or (p.atmo.d > 0 and math.max(p.atmo.d, 0.5) or 0)
+		a.Offset = p.atmo.d > 0 and 0.15 or 0
 		a.Color = SKY.over.acol or p.atmo.col
 		a.Decay = SKY.over.dec or p.atmo.dec
 		a.Glare = p.atmo.gl
