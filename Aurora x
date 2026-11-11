@@ -1575,8 +1575,9 @@ end)
 ------------------------------------------------------------------ CUSTOM SKY
 local SkyAPI = (function()
 	local function C(r, g, b) return Color3.fromRGB(r, g, b) end
-	local SKY = { Name = "Default", Cur = nil, Particles = true, Density = 1, useTime = true, Detail = true, over = {} }
-	local nebPart, nebLow, cloudOrig = nil, nil, nil
+	local SKY = { Name = "Default", Cur = nil, Particles = true, Density = 1, useTime = true, Detail = true, Shooting = true, over = {} }
+	local nebPart, nebLow, nebGlit, cloudOrig = nil, nil, nil, nil
+	local shootT = 3
 	local orig = nil
 	local hidden = {}
 	local fxPart, fxEm = nil, nil
@@ -1719,7 +1720,14 @@ local SkyAPI = (function()
 
 	local function nebClear()
 		if nebPart then nebPart:Destroy() end
-		nebPart, nebLow = nil, nil
+		nebPart, nebLow, nebGlit = nil, nil, nil
+	end
+	-- emitter ancak dunyaya (kameraya) baglandiktan sonra parcacik uretir: on doldurma bu yuzden parent'tan SONRA yapilir
+	local function nebPrefill()
+		for _, p in ipairs({ nebPart, nebLow, nebGlit }) do
+			local em = p and p:FindFirstChildOfClass("ParticleEmitter")
+			if em then pcall(function() em:Emit(math.floor(em.Rate * 45)) end) end
+		end
 	end
 	local function nebBuild(dt)
 		nebClear()
@@ -1736,7 +1744,8 @@ local SkyAPI = (function()
 			part.Size = Vector3.new(1900, sy, 1900)
 			local em = Instance.new("ParticleEmitter")
 			em.Texture = "rbxasset://textures/particles/smoke_main.dds"
-			em.Color = ColorSequence.new(dt.c1, dt.c2)
+			local mid = dt.c1:Lerp(dt.c2, 0.5):Lerp(Color3.new(1, 1, 1), 0.18)
+			em.Color = ColorSequence.new({ ColorSequenceKeypoint.new(0, dt.c1), ColorSequenceKeypoint.new(0.5, mid), ColorSequenceKeypoint.new(1, dt.c2) })
 			local sz = dt.size * sizeMul
 			em.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, sz, sz * 0.45), NumberSequenceKeypoint.new(1, sz, sz * 0.45) })
 			local tr = math.min(0.97, dt.tr + trAdd)
@@ -1752,16 +1761,87 @@ local SkyAPI = (function()
 			em.Shape = Enum.ParticleEmitterShape.Box
 			em.ShapeStyle = Enum.ParticleEmitterShapeStyle.Volume
 			em.Parent = part
-			pcall(function() em:Emit(math.floor(dt.rate * rateMul * 45)) end)
 			return part
 		end
 		-- ust katman (tepe) + alt katman (ufuk): gokyuzunun tamamini kaplar
 		local top = layer("AuroraSkyNebula", 500, 1, 1, 0)
 		top:SetAttribute("h", dt.h)
 		top.Parent = workspace.CurrentCamera
-		local low = layer("AuroraSkyNebulaLow", 160, 1.3, 1.15, 0.03)
+		local low = layer("AuroraSkyNebulaLow", 160, 1, 1, 0.03)
 		low.Parent = top
-		nebPart, nebLow = top, low
+		-- gece gokyuzlerinde: parlayan yildiz tozu katmani
+		local pp = PRESETS[SKY.Name]
+		local gl = nil
+		if pp and (SKY.over.stars or pp.stars or 0) > 0 then
+			gl = Instance.new("Part")
+			gl.Name = "AuroraSkyGlitter"
+			gl.Anchored = true
+			gl.CanCollide = false
+			gl.CanQuery = false
+			gl.CanTouch = false
+			gl.CastShadow = false
+			gl.Transparency = 1
+			gl.Size = Vector3.new(1900, 700, 1900)
+			local ge = Instance.new("ParticleEmitter")
+			ge.Texture = "rbxasset://textures/particles/sparkles_main.dds"
+			ge.Color = ColorSequence.new(Color3.new(1, 1, 1), dt.c1:Lerp(Color3.new(1, 1, 1), 0.5))
+			ge.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 10, 6), NumberSequenceKeypoint.new(1, 10, 6) })
+			ge.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(0.2, 0.1), NumberSequenceKeypoint.new(0.8, 0.1), NumberSequenceKeypoint.new(1, 1) })
+			ge.Lifetime = NumberRange.new(18, 34)
+			ge.Speed = NumberRange.new(0, 0.2)
+			ge.Rate = 5
+			ge.Rotation = NumberRange.new(0, 360)
+			ge.RotSpeed = NumberRange.new(-20, 20)
+			ge.LightEmission = 1
+			ge.LightInfluence = 0
+			ge.LockedToPart = true
+			ge.Shape = Enum.ParticleEmitterShape.Box
+			ge.ShapeStyle = Enum.ParticleEmitterShapeStyle.Volume
+			ge.Parent = gl
+			gl.Parent = top
+		end
+		nebPart, nebLow, nebGlit = top, low, gl
+		if top.Parent then nebPrefill() else top:SetAttribute("need", true) end
+	end
+
+	-- kayan yildiz: kameranin etrafinda rastgele bir yonde, uzakta hizla gecen parlak bir iz
+	local function shoot()
+		local cam = workspace.CurrentCamera
+		if not cam then return end
+		local cp = cam.CFrame.Position
+		local ang = math.random() * math.pi * 2
+		local startP = cp + Vector3.new(math.cos(ang) * 700, math.random(380, 650), math.sin(ang) * 700)
+		local dir = Vector3.new(-math.sin(ang), -0.3, math.cos(ang)).Unit
+		if math.random() < 0.5 then dir = -dir end
+		local part = Instance.new("Part")
+		part.Name = "AuroraShootingStar"
+		part.Anchored = true
+		part.CanCollide = false
+		part.CanQuery = false
+		part.CanTouch = false
+		part.CastShadow = false
+		part.Transparency = 1
+		part.Size = Vector3.new(2, 2, 2)
+		part.Position = startP
+		local a0 = Instance.new("Attachment")
+		a0.Position = Vector3.new(0, 7, 0)
+		a0.Parent = part
+		local a1 = Instance.new("Attachment")
+		a1.Position = Vector3.new(0, -7, 0)
+		a1.Parent = part
+		local tr = Instance.new("Trail")
+		tr.Attachment0, tr.Attachment1 = a0, a1
+		tr.Lifetime = 0.8
+		tr.LightEmission = 1
+		tr.LightInfluence = 0
+		tr.FaceCamera = true
+		tr.Color = ColorSequence.new(Color3.new(1, 1, 1), Color3.fromRGB(150, 190, 255))
+		tr.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(1, 1) })
+		tr.WidthScale = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(1, 0) })
+		tr.Parent = part
+		part.Parent = cam
+		tween(part, 0.9, { Position = startP + dir * 520 }, Enum.EasingStyle.Linear)
+		task.delay(2, function() part:Destroy() end)
 	end
 
 	local function applyLight(p)
@@ -1897,9 +1977,20 @@ local SkyAPI = (function()
 			local cam = workspace.CurrentCamera
 			if cam then
 				if nebPart.Parent ~= cam then nebPart.Parent = cam end
+				if nebPart:GetAttribute("need") then nebPart:SetAttribute("need", nil) nebPrefill() end
 				local cp = cam.CFrame.Position
-				nebPart.CFrame = CFrame.new(cp + Vector3.new(0, nebPart:GetAttribute("h") or 600, 0))
-				if nebLow then nebLow.CFrame = CFrame.new(cp + Vector3.new(0, 130, 0)) end
+				local clk = os.clock()
+				-- katmanlar kameraya sabit ama cok yavas ve farkli hizlarda doner: canli bir gokyuzu hissi
+				nebPart.CFrame = CFrame.new(cp + Vector3.new(0, nebPart:GetAttribute("h") or 600, 0)) * CFrame.Angles(0, clk * 0.006, 0)
+				if nebLow then nebLow.CFrame = CFrame.new(cp + Vector3.new(0, 130, 0)) * CFrame.Angles(0, -clk * 0.004, 0) end
+				if nebGlit then nebGlit.CFrame = CFrame.new(cp + Vector3.new(0, 450, 0)) * CFrame.Angles(0, clk * 0.003, 0) end
+			end
+		end
+		if SKY.Shooting and SKY.Detail and (SKY.over.stars or SKY.Cur.stars or 0) > 0 then
+			shootT = shootT - dt
+			if shootT <= 0 then
+				shootT = 5 + math.random() * 8
+				pcall(shoot)
 			end
 		end
 		if fxPart then
@@ -1938,6 +2029,7 @@ local SkyAPI = (function()
 				end
 			end
 		end,
+		SetShooting = function(on) SKY.Shooting = on end,
 		SetParticles = function(on)
 			SKY.Particles = on
 			if SKY.Cur then pcall(fxBuild, SKY.Cur) end
@@ -3333,6 +3425,7 @@ v3:AddDropdown("Sky Preset", SkyAPI.Order, "Default", function(o)
 	Aurora:Notify("Custom Sky", T_("Sky: ") .. tostring(o), 2.5)
 end)
 v3:AddToggle("Sky Details (clouds / nebula)", true, function(on) SkyAPI.SetDetail(on) end)
+v3:AddToggle("Shooting Stars", true, function(on) SkyAPI.SetShooting(on) end)
 v3:AddSlider("Cloud Cover", 0, 1, 0.5, function(v) SkyAPI.Over("cover", v) end, 0.05)
 v3:AddToggle("Particles (petal / snow / ember)", true, function(on) SkyAPI.SetParticles(on) end)
 v3:AddSlider("Particle Density", 0.2, 3, 1, function(v) SkyAPI.SetDensity(v) end, 0.1)
