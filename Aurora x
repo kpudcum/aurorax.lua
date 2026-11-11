@@ -3203,9 +3203,9 @@ p1:AddToggle("Sit", false, function(on)
 	if h then h.Sit = on end
 end)
 
-local FlyFlag = { On = false } -- Fly acikken Noclip Float yukseklik kontrolunu birakir
-local pNc = Player:AddSection("Noclip & Jump")
+Aurora.FlyFlag = { On = false } -- Fly acikken Noclip Float yukseklik kontrolunu birakir
 do
+	local pNc = Player:AddSection("Noclip & Jump")
 	local NC = { On = false, Float = true }
 	local touched = setmetatable({}, { __mode = "k" })
 	local ncConn = nil
@@ -3221,7 +3221,7 @@ do
 			end
 		end
 		-- havada kal: yercekimiyle zeminden dusme; kameraya bakip ilerleyince yukari/asagi gider, ziplayinca yukselir
-		if NC.Float and not FlyFlag.On then
+		if NC.Float and not Aurora.FlyFlag.On then
 			local hum = char:FindFirstChildOfClass("Humanoid")
 			local root = char:FindFirstChild("HumanoidRootPart")
 			local cam = workspace.CurrentCamera
@@ -3300,8 +3300,8 @@ do
 	pNc:AddToggle("Infinite Jump", false, function(on) IJ.On = on end)
 end
 
-local pFly = Player:AddSection("Fly")
 do
+	local pFly = Player:AddSection("Fly")
 	local FLY = { Speed = 60 }
 	local bv, bg, hb = nil, nil, nil
 	local upHeld, downHeld = false, false
@@ -3340,7 +3340,7 @@ do
 		if hb then hb:Disconnect() hb = nil end
 		if bv then bv:Destroy() bv = nil end
 		if bg then bg:Destroy() bg = nil end
-		FlyFlag.On = false
+		Aurora.FlyFlag.On = false
 		upHeld, downHeld = false, false
 		btnUp.Visible, btnDown.Visible = false, false
 		local char = lp.Character
@@ -3379,7 +3379,7 @@ do
 			Aurora:Notify("Fly", "Character not found", 2.5, "error")
 			return
 		end
-		FlyFlag.On = true
+		Aurora.FlyFlag.On = true
 		vel = Vector3.new(0, 0, 0)
 		btnUp.Visible, btnDown.Visible = mobile, mobile
 		hb = RunService.Heartbeat:Connect(function(dt)
@@ -3436,8 +3436,8 @@ do
 	pFly:AddLabel("PC: Space up, Ctrl/Shift down. Mobile: look where you want to go, use the on-screen buttons. Turn on Noclip to pass through walls.")
 end
 
-local pProt = Player:AddSection("Protection")
 do
+	local pProt = Player:AddSection("Protection")
 	-- ANTI RAGDOLL: devrilme/ragdoll durumlarini kapatir, kapatilan eklemleri geri acar
 	local AR = { On = false }
 	local arAcc = 0
@@ -3453,7 +3453,7 @@ do
 		if st == Enum.HumanoidStateType.Ragdoll or st == Enum.HumanoidStateType.FallingDown then
 			pcall(function() hum:ChangeState(Enum.HumanoidStateType.GettingUp) end)
 		end
-		if hum.PlatformStand and not FlyFlag.On then hum.PlatformStand = false end
+		if hum.PlatformStand and not Aurora.FlyFlag.On then hum.PlatformStand = false end
 		arAcc = arAcc + dt
 		if arAcc < 0.2 then return end
 		arAcc = 0
@@ -3480,7 +3480,7 @@ do
 		if not hum or not root or hum.Health <= 0 then return end
 		local limit = workspace.FallenPartsDestroyHeight + 80
 		local y = root.Position.Y
-		if hum.FloorMaterial ~= Enum.Material.Air and not FlyFlag.On and y > limit then
+		if hum.FloorMaterial ~= Enum.Material.Air and not Aurora.FlyFlag.On and y > limit then
 			AV.safe = root.CFrame
 		end
 		local lowEnough = y < limit or (AV.safe and y < AV.safe.Position.Y - 400)
