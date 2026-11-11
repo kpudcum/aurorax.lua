@@ -3238,6 +3238,28 @@ do
 	end))
 end
 
+do
+	local pBh = Player:AddSection("Bunny Hop")
+	local BH = { On = false, Boost = 12 }
+	pBh:AddToggle("Bunny Hop", false, function(on) BH.On = on end)
+	pBh:AddSlider("Air Boost", 0, 60, 12, function(v) BH.Boost = v end)
+	-- hareket ederken yere degdigi an otomatik ziplar, havadayken hafif ek hiz verir
+	table.insert(conns, RunService.Heartbeat:Connect(function(dt)
+		if not BH.On or Aurora.FlyFlag.On then return end
+		local char = lp.Character
+		local hum = char and char:FindFirstChildOfClass("Humanoid")
+		local root = char and char:FindFirstChild("HumanoidRootPart")
+		if not hum or not root or hum.Health <= 0 or hum.Sit then return end
+		local md = hum.MoveDirection
+		if md.Magnitude < 0.1 then return end
+		if hum.FloorMaterial ~= Enum.Material.Air then
+			hum:ChangeState(Enum.HumanoidStateType.Jumping)
+		elseif BH.Boost > 0 then
+			root.CFrame = root.CFrame + md.Unit * (BH.Boost * dt)
+		end
+	end))
+end
+
 Aurora.FlyFlag = { On = false } -- Fly acikken Noclip Float yukseklik kontrolunu birakir
 do
 	local pNc = Player:AddSection("Noclip & Jump")
@@ -3744,8 +3766,8 @@ do
 	end)
 end
 
-local sv2 = ServerTab:AddSection("Utility")
 do
+	local sv2 = ServerTab:AddSection("Utility")
 	local VirtualUser = game:GetService("VirtualUser")
 	local afkConn = nil
 	local afkOn = false
@@ -3773,6 +3795,37 @@ do
 				if afkOn then poke() end
 			end
 		end)
+	end)
+	local AF = { On = false, Conn = nil }
+	local function afStop()
+		AF.On = false
+		if AF.Conn then AF.Conn:Disconnect() AF.Conn = nil end
+	end
+	gui.Destroying:Connect(afStop)
+	sv2:AddToggle("Anti Fling", false, function(on)
+		afStop()
+		if not on then return end
+		AF.On = true
+		-- diger oyuncularin parcalari bizimle carpismaz (fling bu carpismayla calisir) + asiri hiz/donus sifirlanir
+		AF.Conn = RunService.Stepped:Connect(function()
+			for _, pl in ipairs(Players:GetPlayers()) do
+				if pl ~= lp and pl.Character then
+					for _, d in ipairs(pl.Character:GetDescendants()) do
+						if d:IsA("BasePart") and d.CanCollide then d.CanCollide = false end
+					end
+				end
+			end
+			local char = lp.Character
+			local root = char and char:FindFirstChild("HumanoidRootPart")
+			if root and not Aurora.FlyFlag.On then
+				local v = root.AssemblyLinearVelocity
+				if Vector3.new(v.X, 0, v.Z).Magnitude > 120 or math.abs(v.Y) > 500 or root.AssemblyAngularVelocity.Magnitude > 60 then
+					root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+					root.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
+				end
+			end
+		end)
+		Aurora:Notify("Anti Fling", "Active: other players cannot fling you", 2.5, "success")
 	end)
 end
 
