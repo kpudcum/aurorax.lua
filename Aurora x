@@ -3204,6 +3204,40 @@ p1:AddToggle("Sit", false, function(on)
 	if h then h.Sit = on end
 end)
 
+do
+	local pSb = Player:AddSection("Speed & Jump Bypass")
+	local SB = { Speed = false, Spd = 40, Jump = false, Jmp = 90 }
+	local function parts()
+		local char = lp.Character
+		local hum = char and char:FindFirstChildOfClass("Humanoid")
+		local root = char and (char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso"))
+		return hum, root
+	end
+	pSb:AddToggle("Speed Bypass (CFrame)", false, function(on) SB.Speed = on end)
+	pSb:AddSlider("Bypass Speed", 16, 300, 40, function(v) SB.Spd = v end)
+	pSb:AddToggle("Jump Bypass (Velocity)", false, function(on) SB.Jump = on end)
+	pSb:AddSlider("Bypass Jump Power", 50, 300, 90, function(v) SB.Jmp = v end)
+	-- WalkSpeed/JumpPower'a dokunmaz: hareket kendi koordinat/hiz uzerinden eklenir, oyun degeri geri alsa da calisir
+	table.insert(conns, RunService.Heartbeat:Connect(function(dt)
+		if not SB.Speed or Aurora.FlyFlag.On then return end
+		local hum, root = parts()
+		if not hum or not root or hum.Health <= 0 or hum.Sit then return end
+		local md = hum.MoveDirection
+		if md.Magnitude < 0.1 then return end
+		local extra = SB.Spd - hum.WalkSpeed
+		if extra <= 0 then return end
+		root.CFrame = root.CFrame + md.Unit * (extra * dt)
+	end))
+	table.insert(conns, UIS.JumpRequest:Connect(function()
+		if not SB.Jump then return end
+		local hum, root = parts()
+		if not hum or not root or hum.Health <= 0 or hum.Sit then return end
+		if hum.FloorMaterial == Enum.Material.Air then return end
+		local v = root.AssemblyLinearVelocity
+		root.AssemblyLinearVelocity = Vector3.new(v.X, SB.Jmp, v.Z)
+	end))
+end
+
 Aurora.FlyFlag = { On = false } -- Fly acikken Noclip Float yukseklik kontrolunu birakir
 do
 	local pNc = Player:AddSection("Noclip & Jump")
