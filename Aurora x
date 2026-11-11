@@ -1578,6 +1578,7 @@ local SkyAPI = (function()
 	local SKY = { Name = "Default", Cur = nil, Particles = true, Density = 1, useTime = true, Detail = true, Shooting = true, over = {} }
 	local nebPart, nebLow, nebGlit, cloudOrig = nil, nil, nil, nil
 	local shootT = 3
+	local lastNeb = 0
 	local orig = nil
 	local hidden = {}
 	local fxPart, fxEm = nil, nil
@@ -1592,10 +1593,6 @@ local SkyAPI = (function()
 			atmo = { d = 0.1, col = C(160, 60, 220), dec = C(255, 90, 200), gl = 1, hz = 1 }, tint = C(255, 190, 255), sat = 0.35, con = 0.12, cb = 0,
 			bloom = { 1.2, 40, 1.2 }, rays = 0, stars = 5000, blank = true,
 			fx = { rate = 35, c1 = C(255, 120, 230), c2 = C(120, 160, 255), size = 0.45, speed = 2, life = 10, acc = Vector3.new(0, 0, 0), light = 1, tr = 0.1, spread = 180, up = false } },
-		Sakura = { time = 17.3, amb = C(190, 130, 150), out = C(225, 160, 180), top = C(255, 170, 200), bot = C(200, 130, 160), fog = C(255, 205, 220), fs = 40, fe = 900, bri = 2.2, exp = 0.1,
-			atmo = { d = 0.5, col = C(255, 200, 220), dec = C(255, 150, 190), gl = 0.5, hz = 1.2 }, tint = C(255, 220, 235), sat = 0.15, con = 0.05, cb = 0.02,
-			bloom = { 0.5, 24, 1.8 }, rays = 0.1, stars = 0, blank = true,
-			fx = { rate = 45, c1 = C(255, 175, 205), c2 = C(255, 220, 232), size = 0.55, speed = 5, life = 9, acc = Vector3.new(3, 0, 1.5), light = 0.2, tr = 0.1, spread = 25, up = false } },
 		Snow = { time = 12, amb = C(150, 160, 175), out = C(180, 190, 205), top = C(220, 235, 255), bot = C(150, 165, 185), fog = C(215, 225, 238), fs = 20, fe = 600, bri = 2, exp = 0,
 			atmo = { d = 0.4, col = C(215, 225, 240), dec = C(190, 205, 225), gl = 0.2, hz = 2 }, tint = C(225, 235, 255), sat = -0.15, con = 0.05, cb = 0.03,
 			bloom = { 0.3, 20, 2 }, rays = 0, stars = 0,
@@ -1632,17 +1629,12 @@ local SkyAPI = (function()
 			atmo = { d = 0.45, col = C(220, 90, 40), dec = C(150, 50, 20), gl = 1, hz = 2.5 }, tint = C(255, 195, 150), sat = 0.2, con = 0.15, cb = 0,
 			bloom = { 0.8, 28, 1.4 }, rays = 0.1, stars = 0,
 			fx = { rate = 40, c1 = C(255, 170, 40), c2 = C(255, 60, 10), size = 0.35, speed = 6, life = 6, acc = Vector3.new(1, 0, 0), light = 1, tr = 0.1, spread = 35, up = true } },
-		Desert = { time = 13.5, amb = C(190, 160, 110), out = C(215, 180, 120), top = C(255, 210, 140), bot = C(200, 160, 100), fog = C(235, 200, 150), fs = 30, fe = 1100, bri = 3, exp = 0.2,
-			atmo = { d = 0.52, col = C(240, 205, 150), dec = C(220, 170, 100), gl = 0.6, hz = 2 }, tint = C(255, 235, 195), sat = 0.1, con = 0.1, cb = 0.02,
-			bloom = { 0.5, 24, 1.8 }, rays = 0.1, stars = 0, blank = true,
-			fx = { rate = 30, c1 = C(235, 200, 150), c2 = C(215, 175, 120), size = 0.4, speed = 9, life = 5, acc = Vector3.new(8, 0, 0), light = 0, tr = 0.4, spread = 20, up = false } },
 	}
 
 	-- Her gokyuzu icin: bulut (Clouds), gokyuzu yildiz/nebula katmani (buyuk parcacik dokusu), gunes/ay boyutu
 	local DETAIL = {
 		Space = { cover = 0, den = 0, col = C(255, 255, 255), c1 = C(110, 60, 255), c2 = C(255, 70, 200), rate = 0.7, size = 380, tr = 0.86, light = 1, h = 650, moon = 28 },
 		Galaxy = { cover = 0, den = 0, col = C(255, 255, 255), c1 = C(255, 70, 200), c2 = C(80, 120, 255), rate = 0.9, size = 420, tr = 0.82, light = 1, h = 650, moon = 35 },
-		Sakura = { cover = 0.65, den = 0.55, col = C(255, 205, 220), c1 = C(255, 190, 215), c2 = C(255, 230, 240), rate = 0.5, size = 300, tr = 0.9, light = 0.3, h = 550, sun = 30 },
 		Snow = { cover = 0.9, den = 0.85, col = C(215, 225, 240), c1 = C(235, 240, 250), c2 = C(200, 210, 225), rate = 0.6, size = 340, tr = 0.88, light = 0.1, h = 550, sun = 14 },
 		Sunset = { cover = 0.6, den = 0.7, col = C(255, 160, 110), c1 = C(255, 140, 80), c2 = C(255, 90, 140), rate = 0.6, size = 360, tr = 0.86, light = 0.6, h = 450, sun = 40 },
 		Dawn = { cover = 0.5, den = 0.6, col = C(255, 205, 200), c1 = C(255, 200, 170), c2 = C(200, 170, 230), rate = 0.5, size = 330, tr = 0.88, light = 0.5, h = 500, sun = 32 },
@@ -1653,9 +1645,8 @@ local SkyAPI = (function()
 		Aurora = { cover = 0.15, den = 0.3, col = C(150, 230, 200), c1 = C(70, 255, 190), c2 = C(150, 110, 255), rate = 1.1, size = 300, tr = 0.78, light = 1, h = 520, moon = 14 },
 		Mist = { cover = 1, den = 1, col = C(170, 185, 175), c1 = C(190, 200, 195), c2 = C(150, 165, 158), rate = 0.6, size = 400, tr = 0.86, light = 0.2, h = 450, sun = 10 },
 		Volcano = { cover = 0.85, den = 0.9, col = C(60, 35, 30), c1 = C(255, 90, 30), c2 = C(70, 40, 35), rate = 0.7, size = 380, tr = 0.84, light = 0.6, h = 500, sun = 25 },
-		Desert = { cover = 0.45, den = 0.45, col = C(255, 235, 195), c1 = C(245, 215, 160), c2 = C(230, 190, 130), rate = 0.35, size = 300, tr = 0.92, light = 0.2, h = 600, sun = 34 },
 	}
-	local ORDER = { "Default", "Space", "Galaxy", "Sakura", "Snow", "Sunset", "Dawn", "Midnight", "Neon", "BloodMoon", "Toxic", "Aurora", "Mist", "Volcano", "Desert" }
+	local ORDER = { "Default", "Space", "Galaxy", "Snow", "Sunset", "Dawn", "Midnight", "Neon", "BloodMoon", "Toxic", "Aurora", "Mist", "Volcano" }
 
 	local function save()
 		if orig then return end
@@ -1726,7 +1717,7 @@ local SkyAPI = (function()
 	local function nebPrefill()
 		for _, p in ipairs({ nebPart, nebLow, nebGlit }) do
 			local em = p and p:FindFirstChildOfClass("ParticleEmitter")
-			if em then pcall(function() em:Emit(math.floor(em.Rate * 45)) end) end
+			if em then pcall(function() em:Emit(math.floor(em.Rate * 12)) end) end
 		end
 	end
 	local function nebBuild(dt)
@@ -1750,9 +1741,9 @@ local SkyAPI = (function()
 			em.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, sz, sz * 0.45), NumberSequenceKeypoint.new(1, sz, sz * 0.45) })
 			local tr = math.min(0.97, dt.tr + trAdd)
 			em.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(0.25, tr), NumberSequenceKeypoint.new(0.75, tr), NumberSequenceKeypoint.new(1, 1) })
-			em.Lifetime = NumberRange.new(40, 70)
+			em.Lifetime = NumberRange.new(16, 28)
 			em.Speed = NumberRange.new(0, 0.4)
-			em.Rate = dt.rate * rateMul
+			em.Rate = dt.rate * rateMul * 2.4
 			em.Rotation = NumberRange.new(0, 360)
 			em.RotSpeed = NumberRange.new(-1, 1)
 			em.LightEmission = dt.light
@@ -1787,9 +1778,9 @@ local SkyAPI = (function()
 			ge.Color = ColorSequence.new(Color3.new(1, 1, 1), dt.c1:Lerp(Color3.new(1, 1, 1), 0.5))
 			ge.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 10, 6), NumberSequenceKeypoint.new(1, 10, 6) })
 			ge.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(0.2, 0.1), NumberSequenceKeypoint.new(0.8, 0.1), NumberSequenceKeypoint.new(1, 1) })
-			ge.Lifetime = NumberRange.new(18, 34)
+			ge.Lifetime = NumberRange.new(10, 18)
 			ge.Speed = NumberRange.new(0, 0.2)
-			ge.Rate = 5
+			ge.Rate = 8
 			ge.Rotation = NumberRange.new(0, 360)
 			ge.RotSpeed = NumberRange.new(-20, 20)
 			ge.LightEmission = 1
@@ -1972,6 +1963,15 @@ local SkyAPI = (function()
 		if acc >= 0.5 then
 			acc = 0
 			pcall(applyLight, SKY.Cur)
+			-- oyun kendi Sky/Atmosphere'ini geri koyduysa tekrar gizle (kendi gokyuzumuzun ustune binmesin)
+			pcall(hideForeign)
+			-- katman bir sekilde yok olduysa (oyun temizledi vb.) kendini yeniden kurar
+			local dtl = DETAIL[SKY.Name]
+			if SKY.Detail and dtl and os.clock() - lastNeb > 3 and (not nebPart or not nebPart.Parent or not nebPart:FindFirstChildOfClass("ParticleEmitter")) then
+				lastNeb = os.clock()
+				warn("[Aurora Sky] nebula layer rebuilt")
+				pcall(nebBuild, dtl)
+			end
 		end
 		if nebPart then
 			local cam = workspace.CurrentCamera
