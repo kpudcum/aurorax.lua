@@ -3203,6 +3203,102 @@ p1:AddToggle("Sit", false, function(on)
 	if h then h.Sit = on end
 end)
 
+local pNc = Player:AddSection("Noclip & Jump")
+do
+	local NC = { On = false, Float = true }
+	local touched = setmetatable({}, { __mode = "k" })
+	local ncConn = nil
+
+	-- her fizik adiminda tum karakter parcalarinin carpismasini kapat (oyun tekrar acsa bile ayni karede yeniden kapanir)
+	local function ncStep()
+		local char = lp.Character
+		if not char then return end
+		for _, p in ipairs(char:GetDescendants()) do
+			if p:IsA("BasePart") and p.CanCollide then
+				touched[p] = true
+				p.CanCollide = false
+			end
+		end
+		-- havada kal: yercekimiyle zeminden dusme; kameraya bakip ilerleyince yukari/asagi gider, ziplayinca yukselir
+		if NC.Float then
+			local hum = char:FindFirstChildOfClass("Humanoid")
+			local root = char:FindFirstChild("HumanoidRootPart")
+			local cam = workspace.CurrentCamera
+			if hum and root and cam and hum.Health > 0 then
+				local v = root.AssemblyLinearVelocity
+				local y = 0
+				if hum.MoveDirection.Magnitude > 0.1 then
+					local ly = cam.CFrame.LookVector.Y
+					if math.abs(ly) > 0.3 then y = ly * math.max(hum.WalkSpeed, 16) end
+				end
+				if hum.Jump then y = math.max(y, 35) end
+				root.AssemblyLinearVelocity = Vector3.new(v.X, y, v.Z)
+			end
+		end
+	end
+
+	local function setNoclip(on)
+		NC.On = on
+		if ncConn then ncConn:Disconnect() ncConn = nil end
+		if on then
+			ncConn = RunService.Stepped:Connect(function() pcall(ncStep) end)
+		else
+			for p in pairs(touched) do
+				touched[p] = nil
+				if p.Parent then pcall(function() p.CanCollide = true end) end
+			end
+		end
+	end
+	gui.Destroying:Connect(function() setNoclip(false) end)
+
+	local ncToggle = pNc:AddToggle("Noclip", false, function(on) setNoclip(on) end)
+	pNc:AddToggle("Noclip Float (stay afloat)", true, function(on) NC.Float = on end)
+
+	-- PC: tusla ac/kapat (AddKeybind sadece atama aninda calisir, bu yuzden ayri dinleyici)
+	if not (UIS.TouchEnabled and not UIS.MouseEnabled) then
+		local ncBind, skipUntil = nil, 0
+		pNc:AddKeybind("Noclip Key", nil, function(b)
+			if type(b) == "table" then
+				ncBind = b
+				skipUntil = os.clock() + 0.5
+			end
+		end)
+		table.insert(conns, UIS.InputBegan:Connect(function(i, gp)
+			if gp or not ncBind or not matchesKey(i, ncBind) then return end
+			task.defer(function()
+				if os.clock() < skipUntil then return end
+				ncToggle.Set(not ncToggle.Get())
+			end)
+		end))
+	end
+
+	-- SONSUZ ZIPLAMA: havadayken de ziplama istegini kabul eder (PC + mobil jump butonu), basili tutunca tekrarlar
+	local IJ = { On = false, last = 0 }
+	local function ijBoost()
+		local now = os.clock()
+		if now - IJ.last < 0.12 then return end
+		IJ.last = now
+		local char = lp.Character
+		local hum = char and char:FindFirstChildOfClass("Humanoid")
+		local root = char and char:FindFirstChild("HumanoidRootPart")
+		if not hum or not root or hum.Health <= 0 then return end
+		local v = root.AssemblyLinearVelocity
+		local up = hum.UseJumpPower and hum.JumpPower or math.sqrt(2 * workspace.Gravity * hum.JumpHeight)
+		pcall(function() hum:ChangeState(Enum.HumanoidStateType.Jumping) end)
+		root.AssemblyLinearVelocity = Vector3.new(v.X, up, v.Z)
+	end
+	table.insert(conns, UIS.JumpRequest:Connect(function() if IJ.On then pcall(ijBoost) end end))
+	table.insert(conns, RunService.Heartbeat:Connect(function()
+		if not IJ.On then return end
+		local char = lp.Character
+		local hum = char and char:FindFirstChildOfClass("Humanoid")
+		if hum and hum.Jump and hum:GetState() == Enum.HumanoidStateType.Freefall and os.clock() - IJ.last > 0.3 then
+			pcall(ijBoost)
+		end
+	end))
+	pNc:AddToggle("Infinite Jump", false, function(on) IJ.On = on end)
+end
+
 local p2 = Player:AddSection("Actions")
 do
 	-- AddKeybind sadece tus ATANDIGINDA calisir; atanan tusa sonradan basinca karakteri sifirlamak icin ayri dinleyici
