@@ -3876,6 +3876,71 @@ end)
 v1:AddToggle("Bright mode", false, function(on) Lighting.Brightness = on and 3 or 1 end)
 
 
+do
+	local fbS = Visuals:AddSection("Fullbright")
+	local FB = { On = false, Str = 0.75, Fog = true, Shadows = true, Conn = nil, Orig = nil, PrevEnf = nil, acc = 0 }
+	local function put(prop, val)
+		if Lighting[prop] ~= val then Lighting[prop] = val end
+	end
+	local function apply()
+		local v = math.floor(255 * (0.35 + 0.65 * FB.Str))
+		local c = Color3.fromRGB(v, v, v)
+		enforcedAmbient = c
+		put("OutdoorAmbient", c)
+		put("Brightness", 1.5 + FB.Str * 1.5)
+		if FB.Shadows then put("GlobalShadows", false) end
+		if FB.Fog then
+			put("FogEnd", 100000)
+			put("FogStart", 0)
+		end
+	end
+	local function stop()
+		if FB.Conn then FB.Conn:Disconnect() FB.Conn = nil end
+		if not FB.On then return end
+		FB.On = false
+		enforcedAmbient = FB.PrevEnf
+		local o = FB.Orig
+		if o then
+			pcall(function()
+				Lighting.Ambient = o.Ambient
+				Lighting.OutdoorAmbient = o.OutdoorAmbient
+				Lighting.Brightness = o.Brightness
+				Lighting.GlobalShadows = o.GlobalShadows
+				Lighting.FogEnd = o.FogEnd
+				Lighting.FogStart = o.FogStart
+			end)
+		end
+	end
+	gui.Destroying:Connect(stop)
+	fbS:AddToggle("Fullbright", false, function(on)
+		if not on then
+			stop()
+			return
+		end
+		if FB.On then return end
+		FB.Orig = { Ambient = Lighting.Ambient, OutdoorAmbient = Lighting.OutdoorAmbient, Brightness = Lighting.Brightness,
+			GlobalShadows = Lighting.GlobalShadows, FogEnd = Lighting.FogEnd, FogStart = Lighting.FogStart }
+		FB.PrevEnf = enforcedAmbient
+		FB.On = true
+		apply()
+		-- oyun isiklandirmayi geri yazarsa yarim saniyede bir tekrar uygula
+		FB.Conn = RunService.Heartbeat:Connect(function(dt)
+			FB.acc = FB.acc + dt
+			if FB.acc >= 0.25 then
+				FB.acc = 0
+				pcall(apply)
+			end
+		end)
+		Aurora:Notify("Fullbright", "Everything is fully lit", 2.5, "success")
+	end)
+	fbS:AddSlider("Fullbright Strength (%)", 10, 100, 75, function(v)
+		FB.Str = v / 100
+		if FB.On then pcall(apply) end
+	end)
+	fbS:AddToggle("Remove Fog", true, function(on) FB.Fog = on end)
+	fbS:AddToggle("Remove Shadows", true, function(on) FB.Shadows = on end)
+end
+
 local v3 = Visuals:AddSection("Custom Sky")
 v3:AddDropdown("Sky Preset", SkyAPI.Order, "Default", function(o)
 	SkyAPI.Set(o)
@@ -4260,6 +4325,198 @@ e3:AddDropdown("Tracer From", { "Bottom", "Middle", "Top" }, "Bottom", function(
 end)
 e3:AddToggle("Arrows", false, function(on) ESP.Arrows = on end)
 e3:AddToggle("Skeleton", false, function(on) ESP.Skeleton = on end)
+
+do
+	local eRad = ESPTab:AddSection("Radar")
+	local R = { On = false, Range = 250, Size = 150, Team = true, NPC = false, Rot = true, Names = false, Lock = false }
+	local dots = {}
+	local frameId = 0
+	local hbConn = nil
+	local vp = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(800, 600)
+
+	local root = new("Frame", { Name = "AuroraRadar", Size = UDim2.fromOffset(R.Size, R.Size), Position = UDim2.fromOffset(math.max(8, vp.X - R.Size - 14), 70),
+		BackgroundColor3 = Color3.fromRGB(12, 14, 22), BackgroundTransparency = 0.12, BorderSizePixel = 0, Visible = false, Active = true, ZIndex = 40 })
+	corner(999).Parent = root
+	local rootStroke = stroke(T.line, 2)
+	rootStroke.Parent = root
+	onAccent(function(a) rootStroke.Color = a end)
+
+	local function ring(scale)
+		local f = new("Frame", { Size = UDim2.fromScale(scale, scale), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), BackgroundTransparency = 1, ZIndex = 41 })
+		corner(999).Parent = f
+		stroke(Color3.fromRGB(255, 255, 255), 1, 0.85).Parent = f
+		f.Parent = root
+	end
+	ring(0.66)
+	ring(0.33)
+	local function line(w, h)
+		local f = new("Frame", { Size = UDim2.new(w, 0, h, 0), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), BackgroundColor3 = Color3.fromRGB(255, 255, 255), BackgroundTransparency = 0.9, BorderSizePixel = 0, ZIndex = 41 })
+		f.Parent = root
+		return f
+	end
+	local hl = line(1, 0)
+	hl.Size = UDim2.new(1, 0, 0, 1)
+	local vl = line(0, 1)
+	vl.Size = UDim2.new(0, 1, 1, 0)
+
+	local sweep = new("Frame", { Size = UDim2.new(0, 2, 1, 0), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), BackgroundColor3 = Color3.fromRGB(255, 255, 255), BorderSizePixel = 0, ZIndex = 42 })
+	local sg = new("UIGradient", { Rotation = 90, Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.25), NumberSequenceKeypoint.new(0.5, 0.9), NumberSequenceKeypoint.new(0.501, 1), NumberSequenceKeypoint.new(1, 1) }) })
+	sg.Parent = sweep
+	onAccent(function(a) sweep.BackgroundColor3 = a end)
+	sweep.Parent = root
+
+	local me = new("Frame", { Size = UDim2.fromOffset(8, 8), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Rotation = 45, BorderSizePixel = 0, ZIndex = 45 })
+	onAccent(function(a) me.BackgroundColor3 = a end)
+	me.Parent = root
+
+	local rangeLbl = label({ Text = "250m", TextSize = 10, Font = Enum.Font.GothamBold, TextColor3 = T.sub, TextXAlignment = Enum.TextXAlignment.Center, Size = UDim2.new(0, 60, 0, 12), AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -8), ZIndex = 46 })
+	rangeLbl.Parent = root
+
+	-- surukle (mobil + PC); "Lock Position" acikken tasinmaz
+	do
+		local dragging, dIn, startIn, startPos = false, nil, nil, nil
+		root.InputBegan:Connect(function(i)
+			if R.Lock then return end
+			if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+				dragging, dIn, startIn, startPos = true, i, i.Position, root.Position
+			end
+		end)
+		table.insert(conns, UIS.InputChanged:Connect(function(i)
+			if not dragging then return end
+			if i == dIn or i.UserInputType == Enum.UserInputType.MouseMovement then
+				local d = i.Position - startIn
+				local v = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(800, 600)
+				local x = math.clamp(startPos.X.Offset + d.X, 0, math.max(0, v.X - R.Size))
+				local y = math.clamp(startPos.Y.Offset + d.Y, 0, math.max(0, v.Y - R.Size))
+				root.Position = UDim2.fromOffset(x, y)
+			end
+		end))
+		table.insert(conns, UIS.InputEnded:Connect(function(i)
+			if i == dIn or i.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
+		end))
+	end
+
+	local function getDot(key)
+		local d = dots[key]
+		if d then return d end
+		local f = new("Frame", { Size = UDim2.fromOffset(7, 7), AnchorPoint = Vector2.new(0.5, 0.5), BorderSizePixel = 0, ZIndex = 44 })
+		corner(999).Parent = f
+		stroke(Color3.fromRGB(0, 0, 0), 1, 0.4).Parent = f
+		local t = label({ Text = "", TextSize = 9, Font = Enum.Font.GothamBold, TextColor3 = T.text, TextXAlignment = Enum.TextXAlignment.Center, Size = UDim2.new(0, 70, 0, 10), AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 1, 1), ZIndex = 44 })
+		t.TextStrokeTransparency = 0.5
+		t.Parent = f
+		f.Parent = root
+		d = { f = f, t = t, stamp = 0 }
+		dots[key] = d
+		return d
+	end
+	local function clearDots()
+		for k, d in pairs(dots) do d.f:Destroy() dots[k] = nil end
+	end
+
+	local function place(key, rootPart, fwd, right, mine, col, name)
+		if not rootPart or not rootPart.Parent then return end
+		local rel = rootPart.Position - mine
+		local x, y = rel:Dot(right), rel:Dot(fwd)
+		local dist = math.sqrt(x * x + y * y)
+		local rad = R.Size / 2 - 7
+		local sc = math.min(dist, R.Range) / R.Range
+		local nx, ny = 0, 0
+		if dist > 0.001 then nx, ny = x / dist, y / dist end
+		local d = getDot(key)
+		d.stamp = frameId
+		d.f.Position = UDim2.new(0.5, nx * sc * rad, 0.5, -ny * sc * rad)
+		d.f.BackgroundColor3 = col
+		d.f.BackgroundTransparency = dist > R.Range and 0.55 or 0
+		d.f.Visible = true
+		d.t.Visible = R.Names
+		if R.Names then d.t.Text = name or "" end
+	end
+
+	local function update(dt)
+		local cam = workspace.CurrentCamera
+		local char = lp.Character
+		local myRoot = char and char:FindFirstChild("HumanoidRootPart")
+		sweep.Rotation = (os.clock() * 110) % 360
+		if not cam or not myRoot then
+			for _, d in pairs(dots) do d.f.Visible = false end
+			return
+		end
+		frameId = frameId + 1
+		local fwd, right = Vector3.new(0, 0, -1), Vector3.new(1, 0, 0)
+		if R.Rot then
+			local lv = cam.CFrame.LookVector
+			local flat = Vector3.new(lv.X, 0, lv.Z)
+			if flat.Magnitude > 0.01 then
+				fwd = flat.Unit
+				right = fwd:Cross(Vector3.new(0, 1, 0))
+			end
+		end
+		local mine = myRoot.Position
+		for _, pl in ipairs(Players:GetPlayers()) do
+			if pl ~= lp then
+				local c = pl.Character
+				local hum = c and c:FindFirstChildOfClass("Humanoid")
+				local rt = c and c:FindFirstChild("HumanoidRootPart")
+				if hum and rt and hum.Health > 0 then
+					local mate = lp.Team ~= nil and pl.Team == lp.Team
+					if R.Team or not mate then
+						local col = mate and Color3.fromRGB(80, 225, 140) or (ESP.Rainbow and rainbow or Color3.fromRGB(255, 80, 95))
+						place(pl, rt, fwd, right, mine, col, pl.DisplayName)
+					end
+				end
+			end
+		end
+		if R.NPC then
+			for m in pairs(npcs) do
+				local hum = m.Parent and m:FindFirstChildOfClass("Humanoid")
+				local rt = m.Parent and (m:FindFirstChild("HumanoidRootPart") or m.PrimaryPart)
+				if hum and rt and hum.Health > 0 then
+					place(m, rt, fwd, right, mine, Color3.fromRGB(255, 190, 70), m.Name)
+				end
+			end
+		end
+		for k, d in pairs(dots) do
+			if d.stamp ~= frameId then d.f:Destroy() dots[k] = nil end
+		end
+	end
+
+	local function setOn(on)
+		R.On = on
+		if hbConn then hbConn:Disconnect() hbConn = nil end
+		if on then
+			root.Visible = true
+			root.BackgroundTransparency = 1
+			tween(root, 0.3, { BackgroundTransparency = 0.12 })
+			hbConn = RunService.Heartbeat:Connect(update)
+		else
+			root.Visible = false
+			clearDots()
+		end
+	end
+	gui.Destroying:Connect(function()
+		if hbConn then hbConn:Disconnect() hbConn = nil end
+	end)
+	root.Parent = gui
+
+	eRad:AddToggle("Radar", false, function(on) setOn(on) end)
+	eRad:AddSlider("Radar Range", 50, 1000, 250, function(v)
+		R.Range = v
+		rangeLbl.Text = tostring(math.floor(v)) .. "m"
+	end)
+	eRad:AddSlider("Radar Size", 100, 260, 150, function(v)
+		R.Size = math.floor(v)
+		root.Size = UDim2.fromOffset(R.Size, R.Size)
+	end)
+	eRad:AddToggle("Rotate With Camera", true, function(on) R.Rot = on end)
+	eRad:AddToggle("Show Teammates", true, function(on) R.Team = on end)
+	eRad:AddToggle("Show NPCs", false, function(on)
+		R.NPC = on
+		if on then scanNPCs() end
+	end)
+	eRad:AddToggle("Show Names", false, function(on) R.Names = on end)
+	eRad:AddToggle("Lock Position", false, function(on) R.Lock = on end)
+end
 
 local eInv = ESPTab:AddSection("Inventory & Held Item")
 eInv:AddToggle("Held Item", false, function(on) ESP.HeldItem = on end)
