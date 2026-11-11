@@ -1636,18 +1636,18 @@ local SkyAPI = (function()
 
 	-- Her gokyuzu icin: bulut (Clouds), gokyuzu yildiz/nebula katmani (buyuk parcacik dokusu), gunes/ay boyutu
 	local DETAIL = {
-		Space = { cover = 0, den = 0, col = C(255, 255, 255), c1 = C(110, 60, 255), c2 = C(255, 70, 200), rate = 0.7, size = 380, tr = 0.86, light = 1, h = 650, moon = 28 },
-		Galaxy = { cover = 0, den = 0, col = C(255, 255, 255), c1 = C(255, 70, 200), c2 = C(80, 120, 255), rate = 0.9, size = 420, tr = 0.82, light = 1, h = 650, moon = 35 },
-		Snow = { cover = 0.9, den = 0.85, col = C(215, 225, 240), c1 = C(235, 240, 250), c2 = C(200, 210, 225), rate = 0.6, size = 340, tr = 0.88, light = 0.1, h = 550, sun = 14 },
-		Sunset = { cover = 0.6, den = 0.7, col = C(255, 160, 110), c1 = C(255, 140, 80), c2 = C(255, 90, 140), rate = 0.6, size = 360, tr = 0.86, light = 0.6, h = 450, sun = 40 },
-		Dawn = { cover = 0.5, den = 0.6, col = C(255, 205, 200), c1 = C(255, 200, 170), c2 = C(200, 170, 230), rate = 0.5, size = 330, tr = 0.88, light = 0.5, h = 500, sun = 32 },
-		Midnight = { cover = 0.35, den = 0.5, col = C(70, 85, 140), c1 = C(60, 80, 170), c2 = C(30, 40, 100), rate = 0.5, size = 340, tr = 0.88, light = 0.8, h = 600, moon = 24 },
-		Neon = { cover = 0.3, den = 0.6, col = C(255, 80, 220), c1 = C(255, 60, 220), c2 = C(60, 230, 255), rate = 1, size = 360, tr = 0.8, light = 1, h = 600, moon = 18 },
-		BloodMoon = { cover = 0.5, den = 0.8, col = C(120, 20, 25), c1 = C(200, 30, 30), c2 = C(90, 10, 20), rate = 0.6, size = 360, tr = 0.84, light = 0.9, h = 600, moon = 48 },
-		Toxic = { cover = 0.7, den = 0.8, col = C(120, 190, 50), c1 = C(150, 255, 70), c2 = C(70, 150, 30), rate = 0.7, size = 340, tr = 0.86, light = 0.7, h = 500, sun = 18 },
-		Aurora = { cover = 0.15, den = 0.3, col = C(150, 230, 200), c1 = C(70, 255, 190), c2 = C(150, 110, 255), rate = 1.1, size = 300, tr = 0.78, light = 1, h = 520, moon = 14 },
-		Mist = { cover = 1, den = 1, col = C(170, 185, 175), c1 = C(190, 200, 195), c2 = C(150, 165, 158), rate = 0.6, size = 400, tr = 0.86, light = 0.2, h = 450, sun = 10 },
-		Volcano = { cover = 0.85, den = 0.9, col = C(60, 35, 30), c1 = C(255, 90, 30), c2 = C(70, 40, 35), rate = 0.7, size = 380, tr = 0.84, light = 0.6, h = 500, sun = 25 },
+		Space = { cover = 0, den = 0, col = C(255, 255, 255), c1 = C(110, 60, 255), c2 = C(255, 70, 200), c3 = C(70, 50, 200), rate = 0.7, size = 380, tr = 0.86, light = 1, h = 650, moon = 28 },
+		Galaxy = { cover = 0, den = 0, col = C(255, 255, 255), c1 = C(255, 70, 200), c2 = C(80, 120, 255), c3 = C(170, 60, 255), rate = 0.9, size = 420, tr = 0.82, light = 1, h = 650, moon = 35 },
+		Snow = { cover = 0.9, den = 0.85, col = C(215, 225, 240), c1 = C(235, 240, 250), c2 = C(200, 210, 225), c3 = C(190, 220, 255), rate = 0.6, size = 340, tr = 0.88, light = 0.1, h = 550, sun = 14 },
+		Sunset = { cover = 0.6, den = 0.7, col = C(255, 160, 110), c1 = C(255, 140, 80), c2 = C(255, 90, 140), c3 = C(255, 190, 110), rate = 0.6, size = 360, tr = 0.86, light = 0.6, h = 450, sun = 40 },
+		Dawn = { cover = 0.5, den = 0.6, col = C(255, 205, 200), c1 = C(255, 200, 170), c2 = C(200, 170, 230), c3 = C(255, 160, 200), rate = 0.5, size = 330, tr = 0.88, light = 0.5, h = 500, sun = 32 },
+		Midnight = { cover = 0.35, den = 0.5, col = C(70, 85, 140), c1 = C(60, 80, 170), c2 = C(30, 40, 100), c3 = C(40, 60, 150), rate = 0.5, size = 340, tr = 0.88, light = 0.8, h = 600, moon = 24 },
+		Neon = { cover = 0.3, den = 0.6, col = C(255, 80, 220), c1 = C(255, 60, 220), c2 = C(60, 230, 255), c3 = C(150, 90, 255), rate = 1, size = 360, tr = 0.8, light = 1, h = 600, moon = 18 },
+		BloodMoon = { cover = 0.5, den = 0.8, col = C(120, 20, 25), c1 = C(200, 30, 30), c2 = C(90, 10, 20), c3 = C(255, 60, 40), rate = 0.6, size = 360, tr = 0.84, light = 0.9, h = 600, moon = 48 },
+		Toxic = { cover = 0.7, den = 0.8, col = C(120, 190, 50), c1 = C(150, 255, 70), c2 = C(70, 150, 30), c3 = C(200, 255, 60), rate = 0.7, size = 340, tr = 0.86, light = 0.7, h = 500, sun = 18 },
+		Aurora = { cover = 0.15, den = 0.3, col = C(150, 230, 200), c1 = C(70, 255, 190), c2 = C(150, 110, 255), c3 = C(60, 200, 255), rate = 1.1, size = 300, tr = 0.78, light = 1, h = 520, moon = 14 },
+		Mist = { cover = 1, den = 1, col = C(170, 185, 175), c1 = C(190, 200, 195), c2 = C(150, 165, 158), c3 = C(210, 225, 215), rate = 0.6, size = 400, tr = 0.86, light = 0.2, h = 450, sun = 10 },
+		Volcano = { cover = 0.85, den = 0.9, col = C(60, 35, 30), c1 = C(255, 90, 30), c2 = C(70, 40, 35), c3 = C(255, 150, 30), rate = 0.7, size = 380, tr = 0.84, light = 0.6, h = 500, sun = 25 },
 	}
 	local ORDER = { "Default", "Space", "Galaxy", "Snow", "Sunset", "Dawn", "Midnight", "Neon", "BloodMoon", "Toxic", "Aurora", "Mist", "Volcano" }
 
@@ -1726,7 +1726,7 @@ local SkyAPI = (function()
 	local function nebBuild(dt)
 		nebClear()
 		if not dt or not SKY.Detail then return end
-		local function layer(name, sy, rateMul, sizeMul, trAdd)
+		local function layer(name, sx, sy, rateMul, sizeMul, tr, ca, cb)
 			local part = Instance.new("Part")
 			part.Name = name
 			part.Anchored = true
@@ -1735,21 +1735,20 @@ local SkyAPI = (function()
 			part.CanTouch = false
 			part.CastShadow = false
 			part.Transparency = 1
-			part.Size = Vector3.new(1900, sy, 1900)
+			part.Size = Vector3.new(sx, sy, sx)
 			local em = Instance.new("ParticleEmitter")
 			em.Texture = "rbxasset://textures/particles/smoke_main.dds"
-			local mid = dt.c1:Lerp(dt.c2, 0.5):Lerp(Color3.new(1, 1, 1), 0.18)
-			em.Color = ColorSequence.new({ ColorSequenceKeypoint.new(0, dt.c1), ColorSequenceKeypoint.new(0.5, mid), ColorSequenceKeypoint.new(1, dt.c2) })
+			local mid = dt.c3 or ca:Lerp(cb, 0.5)
+			em.Color = ColorSequence.new({ ColorSequenceKeypoint.new(0, ca), ColorSequenceKeypoint.new(0.5, mid), ColorSequenceKeypoint.new(1, cb) })
 			local sz = dt.size * sizeMul
-			em.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, sz, sz * 0.45), NumberSequenceKeypoint.new(1, sz, sz * 0.45) })
-			local tr = math.min(0.97, dt.tr + trAdd)
+			em.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, sz, sz * 0.4), NumberSequenceKeypoint.new(1, sz, sz * 0.4) })
 			em.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(0.25, tr), NumberSequenceKeypoint.new(0.75, tr), NumberSequenceKeypoint.new(1, 1) })
 			em.Lifetime = NumberRange.new(16, 28)
 			em.Speed = NumberRange.new(0, 0.4)
-			em.Rate = dt.rate * rateMul * 2.4
+			em.Rate = dt.rate * rateMul
 			em.Rotation = NumberRange.new(0, 360)
 			em.RotSpeed = NumberRange.new(-1, 1)
-			em.LightEmission = dt.light
+			em.LightEmission = math.max(dt.light, 0.5)
 			em.LightInfluence = 0
 			em.LockedToPart = true
 			em.Shape = Enum.ParticleEmitterShape.Box
@@ -1757,11 +1756,11 @@ local SkyAPI = (function()
 			em.Parent = part
 			return part
 		end
-		-- ust katman (tepe) + alt katman (ufuk): gokyuzunun tamamini kaplar
-		local top = layer("AuroraSkyNebula", 500, 1, 1, 0)
-		top:SetAttribute("h", dt.h)
+		-- ust katman (tepe) + ufuk katmani: yakin ve belirgin renk, tum gokyuzunu boyar
+		local top = layer("AuroraSkyNebula", 1300, 300, 3.2, 0.8, math.max(0.45, dt.tr - 0.3), dt.c1, dt.c2)
+		top:SetAttribute("h", 300)
 		top.Parent = workspace.CurrentCamera
-		local low = layer("AuroraSkyNebulaLow", 160, 1, 1, 0.03)
+		local low = layer("AuroraSkyNebulaLow", 1500, 50, 4, 0.7, math.max(0.4, dt.tr - 0.38), dt.c2, dt.c1)
 		low.Parent = top
 		-- gece gokyuzlerinde: parlayan yildiz tozu katmani
 		local pp = PRESETS[SKY.Name]
@@ -1775,7 +1774,7 @@ local SkyAPI = (function()
 			gl.CanTouch = false
 			gl.CastShadow = false
 			gl.Transparency = 1
-			gl.Size = Vector3.new(1900, 700, 1900)
+			gl.Size = Vector3.new(1300, 500, 1300)
 			local ge = Instance.new("ParticleEmitter")
 			ge.Texture = "rbxasset://textures/particles/sparkles_main.dds"
 			ge.Color = ColorSequence.new(Color3.new(1, 1, 1), dt.c1:Lerp(Color3.new(1, 1, 1), 0.5))
@@ -1847,6 +1846,8 @@ local SkyAPI = (function()
 		else
 			enforcedClockTime = nil
 		end
+		Lighting.FogEnd = 100000
+		Lighting.FogStart = 0
 		local a = ensure("Atmosphere", "AuroraSky_Atmo")
 		a.Density = SKY.over.dens or (p.atmo.d > 0 and math.max(p.atmo.d, 0.5) or 0)
 		a.Offset = p.atmo.d > 0 and 0.15 or 0
@@ -1984,9 +1985,9 @@ local SkyAPI = (function()
 				local cp = cam.CFrame.Position
 				local clk = os.clock()
 				-- katmanlar kameraya sabit ama cok yavas ve farkli hizlarda doner: canli bir gokyuzu hissi
-				nebPart.CFrame = CFrame.new(cp + Vector3.new(0, nebPart:GetAttribute("h") or 600, 0)) * CFrame.Angles(0, clk * 0.006, 0)
-				if nebLow then nebLow.CFrame = CFrame.new(cp + Vector3.new(0, 130, 0)) * CFrame.Angles(0, -clk * 0.004, 0) end
-				if nebGlit then nebGlit.CFrame = CFrame.new(cp + Vector3.new(0, 450, 0)) * CFrame.Angles(0, clk * 0.003, 0) end
+				nebPart.CFrame = CFrame.new(cp + Vector3.new(0, nebPart:GetAttribute("h") or 300, 0)) * CFrame.Angles(0, clk * 0.006, 0)
+				if nebLow then nebLow.CFrame = CFrame.new(cp + Vector3.new(0, 60, 0)) * CFrame.Angles(0, -clk * 0.004, 0) end
+				if nebGlit then nebGlit.CFrame = CFrame.new(cp + Vector3.new(0, 250, 0)) * CFrame.Angles(0, clk * 0.003, 0) end
 			end
 		end
 		if SKY.Shooting and SKY.Detail and (SKY.over.stars or SKY.Cur.stars or 0) > 0 then
