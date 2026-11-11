@@ -3203,6 +3203,7 @@ p1:AddToggle("Sit", false, function(on)
 	if h then h.Sit = on end
 end)
 
+local FlyFlag = { On = false } -- Fly acikken Noclip Float yukseklik kontrolunu birakir
 local pNc = Player:AddSection("Noclip & Jump")
 do
 	local NC = { On = false, Float = true }
@@ -3220,7 +3221,7 @@ do
 			end
 		end
 		-- havada kal: yercekimiyle zeminden dusme; kameraya bakip ilerleyince yukari/asagi gider, ziplayinca yukselir
-		if NC.Float then
+		if NC.Float and not FlyFlag.On then
 			local hum = char:FindFirstChildOfClass("Humanoid")
 			local root = char:FindFirstChild("HumanoidRootPart")
 			local cam = workspace.CurrentCamera
@@ -3297,6 +3298,203 @@ do
 		end
 	end))
 	pNc:AddToggle("Infinite Jump", false, function(on) IJ.On = on end)
+end
+
+local pFly = Player:AddSection("Fly")
+do
+	local FLY = { Speed = 60 }
+	local bv, bg, hb = nil, nil, nil
+	local upHeld, downHeld = false, false
+	local vel = Vector3.new(0, 0, 0)
+	local mobile = UIS.TouchEnabled and not UIS.MouseEnabled
+	local flyToggle
+
+	-- MOBIL: ekranda yukari / asagi butonlari (cam bakis yonu + joystick ile birlikte kullanilir; zipla butonu da yukari cikarir)
+	local function mkBtn(txt, yoff, setter)
+		local b = new("TextButton", {
+			Text = "", Size = UDim2.fromOffset(54, 54), AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -24, 0.5, yoff),
+			BackgroundColor3 = T.card, BackgroundTransparency = 0.2, AutoButtonColor = false, Visible = false, ZIndex = 30, BorderSizePixel = 0,
+		}, { corner(27), stroke(accent, 2, 0.15) })
+		local st = b:FindFirstChildOfClass("UIStroke")
+		onAccent(function(a) st.Color = a end)
+		label({ Text = txt, Font = Enum.Font.GothamBlack, TextSize = 22, TextColor3 = T.text, TextXAlignment = Enum.TextXAlignment.Center, Size = UDim2.fromScale(1, 1), ZIndex = 31 }).Parent = b
+		b.InputBegan:Connect(function(i)
+			if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then
+				setter(true)
+				tween(b, 0.1, { BackgroundTransparency = 0.5 })
+			end
+		end)
+		b.InputEnded:Connect(function(i)
+			if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then
+				setter(false)
+				tween(b, 0.15, { BackgroundTransparency = 0.2 })
+			end
+		end)
+		b.Parent = gui
+		return b
+	end
+	local btnUp = mkBtn("^", -36, function(v) upHeld = v end)
+	local btnDown = mkBtn("v", 36, function(v) downHeld = v end)
+
+	local function stopFly()
+		if hb then hb:Disconnect() hb = nil end
+		if bv then bv:Destroy() bv = nil end
+		if bg then bg:Destroy() bg = nil end
+		FlyFlag.On = false
+		upHeld, downHeld = false, false
+		btnUp.Visible, btnDown.Visible = false, false
+		local char = lp.Character
+		local hum = char and char:FindFirstChildOfClass("Humanoid")
+		if hum then pcall(function() hum.PlatformStand = false end) end
+	end
+
+	-- karakter yenilendiyse (olum/respawn) govdeyi yeni root'a tasi
+	local function ensureBody(root)
+		if not bv or bv.Parent ~= root then
+			if bv then bv:Destroy() end
+			bv = Instance.new("BodyVelocity")
+			bv.Name = "AuroraFlyBV"
+			bv.MaxForce = Vector3.new(9e9, 9e9, 9e9)
+			bv.Velocity = Vector3.new(0, 0, 0)
+			bv.Parent = root
+		end
+		if not bg or bg.Parent ~= root then
+			if bg then bg:Destroy() end
+			bg = Instance.new("BodyGyro")
+			bg.Name = "AuroraFlyBG"
+			bg.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
+			bg.P = 9e4
+			bg.D = 1e3
+			bg.CFrame = root.CFrame
+			bg.Parent = root
+		end
+	end
+
+	local function startFly()
+		stopFly()
+		local char = lp.Character
+		local hum = char and char:FindFirstChildOfClass("Humanoid")
+		local root = char and char:FindFirstChild("HumanoidRootPart")
+		if not hum or not root then
+			Aurora:Notify("Fly", "Character not found", 2.5, "error")
+			return
+		end
+		FlyFlag.On = true
+		vel = Vector3.new(0, 0, 0)
+		btnUp.Visible, btnDown.Visible = mobile, mobile
+		hb = RunService.Heartbeat:Connect(function(dt)
+			local c = lp.Character
+			local h = c and c:FindFirstChildOfClass("Humanoid")
+			local r = c and c:FindFirstChild("HumanoidRootPart")
+			local cam = workspace.CurrentCamera
+			if not h or not r or not cam or h.Health <= 0 then return end
+			ensureBody(r)
+			if not h.PlatformStand then h.PlatformStand = true end
+			local look, right = cam.CFrame.LookVector, cam.CFrame.RightVector
+			local flat = Vector3.new(look.X, 0, look.Z)
+			local rflat = Vector3.new(right.X, 0, right.Z)
+			local md = h.MoveDirection
+			local dir = Vector3.new(0, 0, 0)
+			if md.Magnitude > 0.05 and flat.Magnitude > 0.01 and rflat.Magnitude > 0.01 then
+				-- joystick/WASD yonunu kameraya gore coz: ileri = bakis yonu (yukari/asagi dahil)
+				dir = look * md:Dot(flat.Unit) + right * md:Dot(rflat.Unit)
+			end
+			local typing = UIS:GetFocusedTextBox() ~= nil
+			local up = upHeld or h.Jump or (not typing and UIS:IsKeyDown(Enum.KeyCode.Space))
+			local down = downHeld or (not typing and (UIS:IsKeyDown(Enum.KeyCode.LeftControl) or UIS:IsKeyDown(Enum.KeyCode.LeftShift)))
+			dir = dir + Vector3.new(0, (up and 1 or 0) - (down and 1 or 0), 0)
+			if dir.Magnitude > 1 then dir = dir.Unit end
+			vel = vel:Lerp(dir * FLY.Speed, 1 - math.exp(-dt * 9))
+			bv.Velocity = vel
+			local face = flat.Magnitude > 0.01 and flat or Vector3.new(0, 0, -1)
+			bg.CFrame = CFrame.lookAt(r.Position, r.Position + face)
+		end)
+	end
+	gui.Destroying:Connect(stopFly)
+
+	flyToggle = pFly:AddToggle("Fly", false, function(on)
+		if on then startFly() else stopFly() end
+	end)
+	pFly:AddSlider("Fly Speed", 10, 300, 60, function(v) FLY.Speed = v end)
+
+	if not mobile then
+		local flyBind, skipUntil = nil, 0
+		pFly:AddKeybind("Fly Key", nil, function(b)
+			if type(b) == "table" then
+				flyBind = b
+				skipUntil = os.clock() + 0.5
+			end
+		end)
+		table.insert(conns, UIS.InputBegan:Connect(function(i, gp)
+			if gp or not flyBind or not matchesKey(i, flyBind) then return end
+			task.defer(function()
+				if os.clock() < skipUntil then return end
+				flyToggle.Set(not flyToggle.Get())
+			end)
+		end))
+	end
+	pFly:AddLabel("PC: Space up, Ctrl/Shift down. Mobile: look where you want to go, use the on-screen buttons. Turn on Noclip to pass through walls.")
+end
+
+local pProt = Player:AddSection("Protection")
+do
+	-- ANTI RAGDOLL: devrilme/ragdoll durumlarini kapatir, kapatilan eklemleri geri acar
+	local AR = { On = false }
+	local arAcc = 0
+	local function arStep(dt)
+		local char = lp.Character
+		local hum = char and char:FindFirstChildOfClass("Humanoid")
+		if not hum or hum.Health <= 0 then return end
+		pcall(function()
+			hum:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, false)
+			hum:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false)
+		end)
+		local st = hum:GetState()
+		if st == Enum.HumanoidStateType.Ragdoll or st == Enum.HumanoidStateType.FallingDown then
+			pcall(function() hum:ChangeState(Enum.HumanoidStateType.GettingUp) end)
+		end
+		if hum.PlatformStand and not FlyFlag.On then hum.PlatformStand = false end
+		arAcc = arAcc + dt
+		if arAcc < 0.2 then return end
+		arAcc = 0
+		for _, d in ipairs(char:GetDescendants()) do
+			if d:IsA("BallSocketConstraint") and string.find(string.lower(d.Name), "ragdoll") then
+				d.Enabled = false
+			elseif d:IsA("Motor6D") and not d.Enabled then
+				d.Enabled = true
+			end
+		end
+	end
+	table.insert(conns, RunService.Heartbeat:Connect(function(dt)
+		if AR.On then pcall(arStep, dt) end
+	end))
+	pProt:AddToggle("Anti Ragdoll", false, function(on) AR.On = on end)
+
+	-- ANTI VOID: son saglam zemini hatirlar; bosluga dusersen oraya geri isinlar
+	local AV = { On = false, safe = nil, cool = 0 }
+	table.insert(conns, RunService.Heartbeat:Connect(function()
+		if not AV.On then return end
+		local char = lp.Character
+		local hum = char and char:FindFirstChildOfClass("Humanoid")
+		local root = char and char:FindFirstChild("HumanoidRootPart")
+		if not hum or not root or hum.Health <= 0 then return end
+		local limit = workspace.FallenPartsDestroyHeight + 80
+		local y = root.Position.Y
+		if hum.FloorMaterial ~= Enum.Material.Air and not FlyFlag.On and y > limit then
+			AV.safe = root.CFrame
+		end
+		local lowEnough = y < limit or (AV.safe and y < AV.safe.Position.Y - 400)
+		if lowEnough and AV.safe and os.clock() > AV.cool then
+			AV.cool = os.clock() + 1
+			root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+			root.CFrame = AV.safe + Vector3.new(0, 5, 0)
+			Aurora:Notify("Anti Void", "Returned to your last safe spot", 2.5, "warn")
+		end
+	end))
+	pProt:AddToggle("Anti Void", false, function(on)
+		AV.On = on
+		if not on then AV.safe = nil end
+	end)
 end
 
 local p2 = Player:AddSection("Actions")
