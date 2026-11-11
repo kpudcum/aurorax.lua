@@ -2646,6 +2646,8 @@ local Aim = {
 	TeamCheck = false,
 	WallCheck = false,
 	Sticky = true,
+	Players = true,
+	NPC = false,
 }
 
 local holding, latched, aimTarget = false, false, false
@@ -2723,12 +2725,32 @@ local function pickAimPart(char, cursor, cam)
 	return best
 end
 
-local function evaluateAim(plr, cam, camPos, cursor, ignoreFov)
-	local char = plr.Character
-	if not char then return nil end
+-- NPC hedef listesi: sadece "NPCs" acikken doldurulur (workspace'teki oyuncu olmayan Humanoid modelleri)
+local aimNpcs = {}
+local function addAimNpc(h)
+	local m = h and h.Parent
+	if m and m:IsA("Model") and m ~= lp.Character and not Players:GetPlayerFromCharacter(m) then aimNpcs[m] = true end
+end
+local function scanAimNpcs()
+	task.spawn(function()
+		local all = workspace:GetDescendants()
+		for i = 1, #all do
+			if all[i]:IsA("Humanoid") then addAimNpc(all[i]) end
+			if i % 800 == 0 then task.wait() end
+		end
+	end)
+end
+workspace.DescendantAdded:Connect(function(o)
+	if Aim.NPC and o:IsA("Humanoid") then task.defer(addAimNpc, o) end
+end)
+
+-- char: oyuncu karakteri ya da NPC modeli
+local function evaluateAim(char, cam, camPos, cursor, ignoreFov)
+	if not char or not char.Parent then return nil end
+	local plr = Players:GetPlayerFromCharacter(char)
 	local hum = char:FindFirstChildOfClass("Humanoid")
 	if not hum or hum.Health <= 0 then return nil end
-	if Aim.TeamCheck and plr.Team ~= nil and plr.Team == lp.Team then return nil end
+	if plr and Aim.TeamCheck and plr.Team ~= nil and plr.Team == lp.Team then return nil end
 	local part = pickAimPart(char, cursor, cam)
 	if not part or not part:IsA("BasePart") then return nil end
 	local dist = (part.Position - camPos).Magnitude
@@ -2770,25 +2792,39 @@ RunService:BindToRenderStep("AimbotUI_Step", Enum.RenderPriority.Camera.Value + 
 	if aiming then
 		local camPos = cam.CFrame.Position
 		if aimTarget and Aim.Sticky then
-			local p = evaluateAim(aimTarget, cam, camPos, cursor, true)
-			point = p
+			local isPlr = Players:GetPlayerFromCharacter(aimTarget) ~= nil
+			if (isPlr and Aim.Players) or (not isPlr and Aim.NPC) then
+				point = evaluateAim(aimTarget, cam, camPos, cursor, true)
+			end
 		end
 		if not point then
 			aimTarget = nil
 			local bestScore
-			for _, plr in ipairs(Players:GetPlayers()) do
-				if plr ~= lp then
-					local p, sd, d, hum = evaluateAim(plr, cam, camPos, cursor, false)
-					if p then
-						local score = sd
-						if Aim.Priority == "Closest distance" then
-							score = d
-						elseif Aim.Priority == "Lowest health" then
-							score = hum.Health
-						end
-						if not bestScore or score < bestScore then
-							bestScore, point, aimTarget = score, p, plr
-						end
+			local function consider(ch)
+				local p, sd, d, hum = evaluateAim(ch, cam, camPos, cursor, false)
+				if p then
+					local score = sd
+					if Aim.Priority == "Closest distance" then
+						score = d
+					elseif Aim.Priority == "Lowest health" then
+						score = hum.Health
+					end
+					if not bestScore or score < bestScore then
+						bestScore, point, aimTarget = score, p, ch
+					end
+				end
+			end
+			if Aim.Players then
+				for _, plr in ipairs(Players:GetPlayers()) do
+					if plr ~= lp and plr.Character then consider(plr.Character) end
+				end
+			end
+			if Aim.NPC then
+				for m in pairs(aimNpcs) do
+					if not m.Parent or not m:IsDescendantOf(workspace) or Players:GetPlayerFromCharacter(m) then
+						aimNpcs[m] = nil
+					else
+						consider(m)
 					end
 				end
 			end
@@ -3885,6 +3921,14 @@ a1:AddToggle("Sticky Target", true, function(on) Aim.Sticky = on end)
 a1:AddToggle("Show FOV", Aim.ShowFOV, function(on) Aim.ShowFOV = on end)
 a1:AddColorPicker("FOV Color", Aim.FOVColor, function(c) Aim.FOVColor = c end)
 a1:AddToggle("FOV Rainbow", false, function(on) Aim.FOVRainbow = on end)
+
+local aTargets = AimTab:AddSection("Target Types")
+aTargets:AddToggle("Target Players", true, function(on) Aim.Players = on end)
+aTargets:AddToggle("Target NPCs", false, function(on)
+	Aim.NPC = on
+	aimTarget = nil
+	if on then scanAimNpcs() else table.clear(aimNpcs) end
+end)
 
 local aTuning = AimTab:AddSection("Aim Tuning")
 aTuning:AddSlider("Smoothness (0 = direct)", 0, 95, 0, function(v) Aim.Smooth = v end)
