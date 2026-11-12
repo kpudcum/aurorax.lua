@@ -3941,6 +3941,115 @@ do
 	fbS:AddToggle("Remove Shadows", true, function(on) FB.Shadows = on end)
 end
 
+do
+	local xhS = Visuals:AddSection("Crosshair")
+	local XH = { On = false, Style = "Cross + Dot", Color = Color3.fromRGB(255, 255, 255), Rainbow = false, Accent = false, Len = 10, Gap = 4, Th = 2, Op = 1, Outline = true, Spin = false, Conn = nil }
+	local accCol = Color3.fromRGB(139, 108, 255)
+	onAccent(function(a) accCol = a end)
+
+	local box = new("Frame", { Name = "AuroraCrosshair", Size = UDim2.fromOffset(240, 240), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), BackgroundTransparency = 1, Visible = false, ZIndex = 60 })
+	local function bar()
+		local b = new("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), BorderSizePixel = 0, ZIndex = 61 })
+		local st = new("UIStroke", { Color = Color3.fromRGB(0, 0, 0), Thickness = 1, Transparency = 0.2 })
+		st.Parent = b
+		b.Parent = box
+		return b, st
+	end
+	local bars, strokes = {}, {}
+	for i = 1, 4 do bars[i], strokes[i] = bar() end
+	local dot, dotSt = bar()
+	corner(999).Parent = dot
+	local ring = new("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), BackgroundTransparency = 1, BorderSizePixel = 0, ZIndex = 61 })
+	corner(999).Parent = ring
+	local ringSt = new("UIStroke", { Thickness = 2, Color = XH.Color })
+	ringSt.Parent = ring
+	local ringOut = new("UIStroke", { Color = Color3.fromRGB(0, 0, 0), Thickness = 1, Transparency = 0.2 })
+	box.Parent = gui
+	ring.Parent = box
+
+	local function layout()
+		local s = XH.Style
+		local showBars = (s == "Cross" or s == "Cross + Dot")
+		local showDot = (s == "Dot" or s == "Cross + Dot" or s == "Circle")
+		local showRing = (s == "Circle")
+		local L, G, T2 = XH.Len, XH.Gap, XH.Th
+		local c = 120
+		-- ust, alt, sol, sag
+		bars[1].Size = UDim2.fromOffset(T2, L); bars[1].Position = UDim2.fromOffset(c, c - G - L / 2)
+		bars[2].Size = UDim2.fromOffset(T2, L); bars[2].Position = UDim2.fromOffset(c, c + G + L / 2)
+		bars[3].Size = UDim2.fromOffset(L, T2); bars[3].Position = UDim2.fromOffset(c - G - L / 2, c)
+		bars[4].Size = UDim2.fromOffset(L, T2); bars[4].Position = UDim2.fromOffset(c + G + L / 2, c)
+		local ds = math.max(2, T2 + 1)
+		dot.Size = UDim2.fromOffset(ds, ds)
+		dot.Position = UDim2.fromOffset(c, c)
+		local rs = (G + L) * 2
+		ring.Size = UDim2.fromOffset(rs, rs)
+		ring.Position = UDim2.fromOffset(c, c)
+		ringSt.Thickness = T2
+		for i = 1, 4 do
+			bars[i].Visible = showBars
+			strokes[i].Enabled = XH.Outline
+		end
+		dot.Visible = showDot
+		dotSt.Enabled = XH.Outline
+		ring.Visible = showRing
+		ringOut.Enabled = XH.Outline
+	end
+	local function paint(col)
+		local tr = 1 - XH.Op
+		for i = 1, 4 do
+			bars[i].BackgroundColor3 = col
+			bars[i].BackgroundTransparency = tr
+		end
+		dot.BackgroundColor3 = col
+		dot.BackgroundTransparency = tr
+		ringSt.Color = col
+		ringSt.Transparency = tr
+	end
+	local function pick()
+		if XH.Rainbow then return Color3.fromHSV((os.clock() * 0.3) % 1, 0.85, 1) end
+		if XH.Accent then return accCol end
+		return XH.Color
+	end
+	local function refresh()
+		layout()
+		paint(pick())
+	end
+	local function stop()
+		if XH.Conn then XH.Conn:Disconnect() XH.Conn = nil end
+	end
+	gui.Destroying:Connect(stop)
+
+	xhS:AddToggle("Crosshair", false, function(on)
+		XH.On = on
+		stop()
+		box.Visible = on
+		if not on then return end
+		refresh()
+		XH.Conn = RunService.Heartbeat:Connect(function()
+			if XH.Rainbow or XH.Accent then paint(pick()) end
+			box.Rotation = XH.Spin and ((os.clock() * 90) % 360) or 0
+		end)
+	end)
+	xhS:AddDropdown("Crosshair Style", { "Cross", "Cross + Dot", "Dot", "Circle" }, "Cross + Dot", function(o)
+		XH.Style = o
+		refresh()
+	end)
+	xhS:AddColorPicker("Crosshair Color", XH.Color, function(c)
+		XH.Color = c
+		refresh()
+	end)
+	xhS:AddToggle("Rainbow", false, function(on) XH.Rainbow = on refresh() end)
+	xhS:AddToggle("Use Accent Color", false, function(on) XH.Accent = on refresh() end)
+	xhS:AddSlider("Length", 2, 40, 10, function(v) XH.Len = math.floor(v) refresh() end)
+	xhS:AddSlider("Gap", 0, 24, 4, function(v) XH.Gap = math.floor(v) refresh() end)
+	xhS:AddSlider("Thickness", 1, 6, 2, function(v) XH.Th = math.floor(v) refresh() end)
+	xhS:AddSlider("Opacity (%)", 10, 100, 100, function(v) XH.Op = v / 100 refresh() end)
+	xhS:AddToggle("Outline", true, function(on) XH.Outline = on refresh() end)
+	xhS:AddToggle("Spin", false, function(on) XH.Spin = on end)
+	refresh()
+end
+
 local v3 = Visuals:AddSection("Custom Sky")
 v3:AddDropdown("Sky Preset", SkyAPI.Order, "Default", function(o)
 	SkyAPI.Set(o)
@@ -4434,7 +4543,8 @@ do
 		local x, y = rel:Dot(right), rel:Dot(fwd)
 		local dist = math.sqrt(x * x + y * y)
 		local rad = R.Size / 2 - 7
-		local sc = math.min(dist, R.Range) / R.Range
+		-- karekok olcek: menzil buyuse bile yakindaki oyuncular merkeze yigilmaz, aralarindaki fark okunur
+		local sc = math.sqrt(math.min(dist, R.Range) / R.Range)
 		local nx, ny = 0, 0
 		if dist > 0.001 then nx, ny = x / dist, y / dist end
 		local d = getDot(key)
