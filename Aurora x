@@ -1537,6 +1537,8 @@ function Aurora:CreateWindow(titleText, subtitle)
 		end)
 	end
 
+	Window.SetOpen = setOpen
+	Window.IsOpen = function() return isOpen end
 	Window.Instance = holder
 	return Window
 end
@@ -4430,10 +4432,28 @@ do
 	local function sink() return Enum.ContextActionResult.Sink end
 
 	-- mobil: sol joystick (hareket), sag tarafa surukle (bakis), yukari/asagi butonlari ve cikis
-	local function buildMobileUI()
+	local function buildUI()
 		local vp = workspace.CurrentCamera.ViewportSize
 		local root = new("Frame", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, BorderSizePixel = 0, Active = false, ZIndex = 50 })
 		local conns2 = {}
+		-- ekran ustunde kontrol ipucu: ilk saniyelerde net, sonra soluklasir
+		local hintText = UIS.KeyboardEnabled and ("FREECAM  |  WASD move  |  Space / Ctrl up-down  |  Shift fast  |  hold Right Mouse to look  |  " .. tostring(FC.Key.value and FC.Key.value.Name or "key") .. " to exit")
+			or "FREECAM  |  Left stick: move  |  Drag right side: look  |  Exit: top button"
+		local hint = label({ Text = hintText, Font = Enum.Font.GothamBold, TextSize = 11, TextColor3 = T.text, TextXAlignment = Enum.TextXAlignment.Center, AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 14), Size = UDim2.fromOffset(math.min(vp.X - 20, 640), 26), ZIndex = 53 })
+		hint.BackgroundTransparency = 0.2
+		hint.BackgroundColor3 = T.card
+		corner(13).Parent = hint
+		local hst = stroke(accent, 1.5, 0.3)
+		hst.Parent = hint
+		onAccent(function(a) hst.Color = a end)
+		hint.Parent = root
+		task.delay(8, function()
+			if hint.Parent then
+				tween(hint, 0.8, { BackgroundTransparency = 0.75, TextTransparency = 0.55 })
+				tween(hst, 0.8, { Transparency = 0.8 })
+			end
+		end)
+		if UIS.TouchEnabled then
 		local base = new("Frame", { Size = UDim2.fromOffset(130, 130), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromOffset(100, vp.Y - 110), BackgroundColor3 = T.card, BackgroundTransparency = 0.35, BorderSizePixel = 0, Active = true, ZIndex = 51 }, { corner(65) })
 		local bst = stroke(accent, 2, 0.3)
 		bst.Parent = base
@@ -4495,6 +4515,7 @@ do
 			if fcToggle then fcToggle.Set(false) else stopFC() end
 		end)
 		ex.Parent = root
+		end
 		root.Parent = gui
 		return { root = root, conns = conns2 }
 	end
@@ -4504,34 +4525,31 @@ do
 		if not cam then return end
 		if cam.CameraType ~= Enum.CameraType.Scriptable then cam.CameraType = Enum.CameraType.Scriptable end
 		local typing = UIS:GetFocusedTextBox() ~= nil
-		local mx, mz, my, fast = 0, 0, 0, 1
-		if AIM_MOBILE then
-			mx, mz, my = FC.mv.X, -FC.mv.Y, FC.up
-			local d = FC.look
-			FC.look = Vector2.new(0, 0)
-			FC.yaw = FC.yaw - math.rad(d.X * FC.Sens * 1.4)
-			FC.pitch = math.clamp(FC.pitch - math.rad(d.Y * FC.Sens * 1.4), -1.5, 1.5)
-		else
-			if not typing then
-				if UIS:IsKeyDown(K.W) then mz = mz + 1 end
-				if UIS:IsKeyDown(K.S) then mz = mz - 1 end
-				if UIS:IsKeyDown(K.D) then mx = mx + 1 end
-				if UIS:IsKeyDown(K.A) then mx = mx - 1 end
-				if UIS:IsKeyDown(K.Space) or UIS:IsKeyDown(K.E) then my = my + 1 end
-				if UIS:IsKeyDown(K.LeftControl) or UIS:IsKeyDown(K.Q) then my = my - 1 end
-				if UIS:IsKeyDown(K.LeftShift) then fast = FC.Fast end
-			end
-			-- sag tik basili tutarak bakilir (imlec kilitlenir), birakinca menu kullanilabilir
-			local rmb = (not typing) and UIS:IsMouseButtonPressed(Enum.UserInputType.MouseButton2)
-			if rmb ~= FC.rmb then
-				FC.rmb = rmb
-				UIS.MouseBehavior = rmb and Enum.MouseBehavior.LockCurrentPosition or Enum.MouseBehavior.Default
-			end
-			if rmb then
-				local d = UIS:GetMouseDelta()
-				FC.yaw = FC.yaw - math.rad(d.X * FC.Sens)
-				FC.pitch = math.clamp(FC.pitch - math.rad(d.Y * FC.Sens), -1.5, 1.5)
-			end
+		local mx, mz, my, fast = FC.mv.X, -FC.mv.Y, FC.up, 1
+		-- dokunmatik bakis (sag taraf surukleme)
+		local dl = FC.look
+		FC.look = Vector2.new(0, 0)
+		FC.yaw = FC.yaw - math.rad(dl.X * FC.Sens * 1.4)
+		FC.pitch = math.clamp(FC.pitch - math.rad(dl.Y * FC.Sens * 1.4), -1.5, 1.5)
+		if not typing then
+			if UIS:IsKeyDown(K.W) then mz = mz + 1 end
+			if UIS:IsKeyDown(K.S) then mz = mz - 1 end
+			if UIS:IsKeyDown(K.D) then mx = mx + 1 end
+			if UIS:IsKeyDown(K.A) then mx = mx - 1 end
+			if UIS:IsKeyDown(K.Space) or UIS:IsKeyDown(K.E) then my = my + 1 end
+			if UIS:IsKeyDown(K.LeftControl) or UIS:IsKeyDown(K.Q) then my = my - 1 end
+			if UIS:IsKeyDown(K.LeftShift) then fast = FC.Fast end
+		end
+		-- fare: sag tik basili tutarak bakilir (imlec kilitlenir), birakinca menu kullanilabilir
+		local rmb = (not typing) and UIS:IsMouseButtonPressed(Enum.UserInputType.MouseButton2)
+		if rmb ~= FC.rmb then
+			FC.rmb = rmb
+			UIS.MouseBehavior = rmb and Enum.MouseBehavior.LockCurrentPosition or Enum.MouseBehavior.Default
+		end
+		if rmb then
+			local d = UIS:GetMouseDelta()
+			FC.yaw = FC.yaw - math.rad(d.X * FC.Sens)
+			FC.pitch = math.clamp(FC.pitch - math.rad(d.Y * FC.Sens), -1.5, 1.5)
 		end
 		local k = 40 - 0.35 * FC.Smooth
 		local a = 1 - math.exp(-dt * k)
@@ -4563,9 +4581,12 @@ do
 			CAS:BindActionAtPriority("AuroraFreecamSink", sink, false, Enum.ContextActionPriority.High.Value, K.W, K.A, K.S, K.D, K.Space, K.Q, K.E, K.LeftControl, K.LeftShift)
 		end)
 		FC.On = true
-		if AIM_MOBILE then FC.ui = buildMobileUI() end
-		RunService:BindToRenderStep("AuroraFreecam", Enum.RenderPriority.Camera.Value + 1, step)
-		Aurora:Notify("Freecam", AIM_MOBILE and "Left stick: move. Drag right side: look." or "WASD move, Space/Ctrl up/down, Shift fast. Hold right mouse to look.", 3.5, "success")
+		-- menu acik kalirsa kontrolleri ortbasar: freecam acilirken menu gizlenir, kapaninca geri acilir
+		FC.wasOpen = Window.IsOpen and Window.IsOpen() or false
+		if FC.wasOpen and Window.SetOpen then Window.SetOpen(false) end
+		local okUI, errUI = pcall(function() FC.ui = buildUI() end)
+		if not okUI then Aurora:Notify("Freecam", "UI error: " .. tostring(errUI), 5, "error") end
+		RunService:BindToRenderStep("AuroraFreecam", Enum.RenderPriority.Last.Value + 1, step)
 	end
 	stopFC = function()
 		if not FC.On then return end
@@ -4580,6 +4601,8 @@ do
 			FC.ui.root:Destroy()
 			FC.ui = nil
 		end
+		if FC.wasOpen and not FC.dying and Window.SetOpen then Window.SetOpen(true) end
+		FC.wasOpen = false
 		local cam = workspace.CurrentCamera
 		if cam and FC.saved then
 			cam.CameraType = (FC.saved.type == Enum.CameraType.Scriptable) and Enum.CameraType.Custom or FC.saved.type
@@ -4587,10 +4610,22 @@ do
 			cam.CameraSubject = FC.saved.subject or hum
 		end
 	end
-	gui.Destroying:Connect(stopFC)
+	gui.Destroying:Connect(function()
+		FC.dying = true
+		stopFC()
+	end)
 
 	fcToggle = fcS:AddToggle("Freecam", false, function(on)
-		if on then startFC() else stopFC() end
+		if on then
+			local ok, err = pcall(startFC)
+			if not ok then
+				FC.On = true
+				stopFC()
+				Aurora:Notify("Freecam", "Error: " .. tostring(err), 5, "error")
+			end
+		else
+			stopFC()
+		end
 	end)
 	if not AIM_MOBILE then
 		fcS:AddKeybind("Freecam Key", FC.Key, function(b)
