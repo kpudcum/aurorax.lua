@@ -4736,6 +4736,282 @@ if AIM_MOBILE then -- ekrandaki aim butonu ayarlari sadece telefonda gorunur
 	aBtn:AddLabel("Tap: toggles on/off in Toggle mode, hold in Hold mode. Drag to move.")
 end
 
+do
+	local TB = { Enabled = false, Mode = AIM_MOBILE and "Toggle" or "Hold", Key = { kind = "mouse", value = Enum.UserInputType.MouseButton2 },
+		Part = "Head", Method = "Auto", TeamCheck = true, NeedAim = false, Range = 600, DMin = 60, DMax = 140, CD = 120, Chance = 90,
+		ShowButton = true, BtnSize = AIM_MOBILE and 66 or 56 }
+	local tHold, tLatched, tBtnHold = false, false, false
+	local acquired, fireAt, nextOk = nil, 0, 0
+	local rp = RaycastParams.new()
+	rp.FilterType = Enum.RaycastFilterType.Exclude
+	rp.IgnoreWater = true
+	local VIM = nil
+	pcall(function() VIM = game:GetService("VirtualInputManager") end)
+
+	local function armed()
+		if not TB.Enabled then return false end
+		if TB.Mode == "Always" then return true end
+		if TB.Mode == "Toggle" then return tLatched end
+		return tHold or tBtnHold
+	end
+
+	-- vurulan parcadan karakter modelini bul (aksesuar/ic ice model olabilir)
+	local function resolve(inst)
+		local m = inst:FindFirstAncestorWhichIsA("Model")
+		while m and not m:FindFirstChildOfClass("Humanoid") do
+			m = m.Parent and m.Parent:FindFirstAncestorWhichIsA("Model") or nil
+		end
+		return m
+	end
+	local function partOk(inst)
+		if TB.Part == "Any" then return true end
+		if TB.Part == "Head" then return inst.Name == "Head" end
+		return inst.Name ~= "Head"
+	end
+	local function valid(m)
+		local hum = m:FindFirstChildOfClass("Humanoid")
+		if not hum or hum.Health <= 0 then return false end
+		local pl = Players:GetPlayerFromCharacter(m)
+		if pl then
+			if pl == lp or not Aim.Players then return false end
+			if TB.TeamCheck and lp.Team ~= nil and not lp.Neutral and pl.Team == lp.Team then return false end
+			return true
+		end
+		return Aim.NPC
+	end
+
+	-- nisangahtan ray at: duvar/engel varsa vurmaz (otomatik wall check); gorunmez/carpmayan parcalar atlanir
+	local function scan(cam, cursor)
+		local char = lp.Character
+		local ignore = {}
+		if char then ignore[1] = char end
+		local ray = cam:ViewportPointToRay(cursor.X, cursor.Y)
+		local dir = ray.Direction * TB.Range
+		for _ = 1, 5 do
+			rp.FilterDescendantsInstances = ignore
+			local res = workspace:Raycast(ray.Origin, dir, rp)
+			if not res then return nil end
+			local inst = res.Instance
+			local m = resolve(inst)
+			if m and m ~= char then return m, inst end
+			if inst.Transparency >= 0.9 or not inst.CanCollide then
+				table.insert(ignore, inst)
+			else
+				return nil
+			end
+		end
+		return nil
+	end
+
+	local function doTool()
+		local ch = lp.Character
+		local tool = ch and ch:FindFirstChildOfClass("Tool")
+		if tool then
+			pcall(function() tool:Activate() end)
+			return true
+		end
+		return false
+	end
+	local function doClick(x, y)
+		local ok = false
+		if VIM then
+			ok = pcall(function() VIM:SendMouseButtonEvent(x, y, 0, true, game, 0) end)
+			if ok then
+				task.delay(0.02 + math.random() * 0.04, function()
+					pcall(function() VIM:SendMouseButtonEvent(x, y, 0, false, game, 0) end)
+				end)
+			end
+		end
+		if not ok then pcall(function() mouse1click() end) end
+	end
+	local function fire(cursor)
+		if TB.Method == "Tool Activate" then
+			doTool()
+		elseif TB.Method == "Mouse Click" then
+			doClick(cursor.X, cursor.Y)
+		else
+			if not doTool() then doClick(cursor.X, cursor.Y) end
+		end
+	end
+
+	table.insert(conns, RunService.Heartbeat:Connect(function()
+		if not armed() then acquired = nil return end
+		if TB.NeedAim and not isAiming() then acquired = nil return end
+		if UIS:GetFocusedTextBox() then return end
+		local cam = workspace.CurrentCamera
+		local char = lp.Character
+		local myHum = char and char:FindFirstChildOfClass("Humanoid")
+		if not cam or not myHum or myHum.Health <= 0 then acquired = nil return end
+		local cursor = getCursor(cam)
+		local m, inst = scan(cam, cursor)
+		if not m or not valid(m) or not partOk(inst) then acquired = nil return end
+		local now = os.clock()
+		-- yeni hedefte rastgele tepki suresi: anlik ates tespit edilmeyi kolaylastirir
+		if acquired ~= m then
+			acquired = m
+			local lo, hi = TB.DMin, math.max(TB.DMax, TB.DMin)
+			fireAt = now + (lo + math.random() * (hi - lo)) / 1000
+		end
+		if now < fireAt or now < nextOk then return end
+		nextOk = now + (TB.CD * (0.85 + math.random() * 0.3)) / 1000
+		if math.random() * 100 > TB.Chance then return end
+		fire(cursor)
+	end))
+
+	table.insert(conns, UIS.InputBegan:Connect(function(input, gp)
+		if gp then return end
+		if matchesKey(input, TB.Key) then
+			tHold = true
+			if TB.Mode == "Toggle" then tLatched = not tLatched end
+		end
+	end))
+	table.insert(conns, UIS.InputEnded:Connect(function(input)
+		if matchesKey(input, TB.Key) then tHold = false end
+	end))
+
+	------------------------------------------------ UI
+	local tbS = AimTab:AddSection("Triggerbot")
+	tbS:AddToggle("Enable Triggerbot", false, function(on)
+		TB.Enabled = on
+		acquired = nil
+		if not on then tLatched, tBtnHold, tHold = false, false, false end
+	end)
+	tbS:AddDropdown("Trigger Mode", { "Hold", "Toggle", "Always" }, TB.Mode, function(o)
+		TB.Mode = o
+		tLatched, tBtnHold, tHold = false, false, false
+	end)
+	if not AIM_MOBILE then
+		tbS:AddKeybind("Trigger Key", TB.Key, function(b)
+			TB.Key = b
+			tHold, tLatched = false, false
+		end)
+	end
+	tbS:AddDropdown("Trigger Part", { "Head", "Body", "Any" }, "Head", function(o) TB.Part = o end)
+	tbS:AddDropdown("Fire Method", { "Auto", "Tool Activate", "Mouse Click" }, "Auto", function(o) TB.Method = o end)
+	tbS:AddToggle("Team Check", true, function(on) TB.TeamCheck = on end)
+	tbS:AddToggle("Require Aimbot Active", false, function(on) TB.NeedAim = on end)
+	tbS:AddSlider("Max Range", 20, 2000, 600, function(v) TB.Range = v end)
+	tbS:AddLabel("Uses Target Types (Players / NPCs) from below. Walls block shots automatically.")
+
+	local tbH = AimTab:AddSection("Triggerbot Humanizer")
+	tbH:AddSlider("Reaction Min (ms)", 0, 500, 60, function(v) TB.DMin = v end)
+	tbH:AddSlider("Reaction Max (ms)", 0, 800, 140, function(v) TB.DMax = v end)
+	tbH:AddSlider("Fire Delay (ms)", 40, 1000, 120, function(v) TB.CD = v end)
+	tbH:AddSlider("Hit Chance (%)", 10, 100, 90, function(v) TB.Chance = v end)
+	tbH:AddLabel("Random reaction time and skipped shots look human. Lower chance = safer.")
+
+	------------------------------------------------ MOBIL TRIGGER BUTONU (sadece telefonda)
+	if AIM_MOBILE then
+		local tbBtn = new("TextButton", {
+			Name = "TriggerButton", Text = "", AutoButtonColor = false, AnchorPoint = Vector2.new(0.5, 0.5),
+			Size = UDim2.fromOffset(TB.BtnSize, TB.BtnSize), BackgroundColor3 = T.card, BorderSizePixel = 0, Visible = false, ZIndex = 40,
+		}, { new("UICorner", { CornerRadius = UDim.new(0.5, 0) }) })
+		local tScale = new("UIScale", { Scale = 1 })
+		tScale.Parent = tbBtn
+		local tRing = stroke(accent, 2, 0.1)
+		onAccent(function(a) tRing.Color = a end)
+		tRing.Parent = tbBtn
+		local tFill = new("Frame", { Size = UDim2.fromScale(1, 1), BackgroundColor3 = Color3.new(1, 1, 1), BackgroundTransparency = 1, BorderSizePixel = 0, ZIndex = 41 }, { new("UICorner", { CornerRadius = UDim.new(0.5, 0) }) })
+		accentGrad(tFill, 45)
+		tFill.Parent = tbBtn
+		local tMain = new("TextLabel", {
+			Text = "TRIG", Font = Enum.Font.GothamBlack, TextScaled = true, BackgroundTransparency = 1, TextColor3 = T.text,
+			Size = UDim2.fromScale(0.8, 0.34), Position = UDim2.fromScale(0.1, 0.2), ZIndex = 42,
+		}, { new("UITextSizeConstraint", { MaxTextSize = 17, MinTextSize = 8 }) })
+		tMain.Parent = tbBtn
+		local tSub = new("TextLabel", {
+			Text = "OFF", Font = Enum.Font.GothamBold, TextScaled = true, BackgroundTransparency = 1, TextColor3 = T.sub,
+			Size = UDim2.fromScale(0.7, 0.2), Position = UDim2.fromScale(0.15, 0.56), ZIndex = 42,
+		}, { new("UITextSizeConstraint", { MaxTextSize = 11, MinTextSize = 6 }) })
+		tSub.Parent = tbBtn
+		tbBtn.Parent = gui
+
+		local function viewport()
+			local cam = workspace.CurrentCamera
+			return cam and cam.ViewportSize or Vector2.new(1280, 720)
+		end
+		local function resetPos()
+			local vp = viewport()
+			tbBtn.Position = UDim2.fromOffset(vp.X - 70, vp.Y * 0.6 + Aim.ButtonSize + 18)
+		end
+		resetPos()
+
+		local pressed, dragged = false, false
+		local startIn, startPos, moveInput = nil, Vector2.new(0, 0), nil
+		tbBtn.InputBegan:Connect(function(i)
+			if i.UserInputType ~= Enum.UserInputType.MouseButton1 and i.UserInputType ~= Enum.UserInputType.Touch then return end
+			pressed, dragged = true, false
+			startIn = i.Position
+			moveInput = i
+			startPos = Vector2.new(tbBtn.Position.X.Offset, tbBtn.Position.Y.Offset)
+			tween(tScale, 0.1, { Scale = 0.92 })
+			task.delay(0.08, function()
+				if pressed and not dragged and TB.Mode == "Hold" then tBtnHold = true end
+			end)
+			i.Changed:Connect(function()
+				if i.UserInputState == Enum.UserInputState.End and pressed then
+					pressed = false
+					tween(tScale, 0.15, { Scale = 1 })
+					if TB.Mode == "Hold" then
+						tBtnHold = false
+					elseif TB.Mode == "Toggle" and not dragged then
+						tLatched = not tLatched
+					end
+				end
+			end)
+		end)
+		table.insert(conns, UIS.InputChanged:Connect(function(i)
+			if not pressed or i ~= moveInput then return end
+			local d = i.Position - startIn
+			if not dragged and d.Magnitude >= 10 then
+				dragged = true
+				tBtnHold = false
+			end
+			if dragged then
+				local vp = viewport()
+				local half = TB.BtnSize / 2
+				local x = math.clamp(startPos.X + d.X, half, math.max(half, vp.X - half))
+				local y = math.clamp(startPos.Y + d.Y, half, math.max(half, vp.Y - half))
+				tbBtn.Position = UDim2.fromOffset(x, y)
+			end
+		end))
+
+		local wasShown, lastKey = false, ""
+		table.insert(conns, RunService.Heartbeat:Connect(function()
+			local show = TB.Enabled and TB.ShowButton
+			if show ~= wasShown then
+				wasShown = show
+				tbBtn.Visible = show
+				if show then
+					tScale.Scale = 0
+					tween(tScale, 0.4, { Scale = 1 }, Enum.EasingStyle.Back)
+				end
+			end
+			if not show then return end
+			local size = TB.BtnSize
+			if tbBtn.Size.X.Offset ~= size then tbBtn.Size = UDim2.fromOffset(size, size) end
+			local active = armed()
+			local txt
+			if TB.Mode == "Always" then txt = "ALWAYS"
+			elseif TB.Mode == "Toggle" then txt = active and "ON" or "OFF"
+			else txt = active and "FIRE" or "HOLD" end
+			local key = tostring(active) .. txt
+			if key ~= lastKey then
+				lastKey = key
+				tSub.Text = txt
+				tween(tFill, 0.2, { BackgroundTransparency = active and 0.35 or 1 })
+				tSub.TextColor3 = active and T.text or T.sub
+			end
+		end))
+
+		local tbB = AimTab:AddSection("Trigger Button")
+		tbB:AddToggle("Show Trigger Button", true, function(on) TB.ShowButton = on end)
+		tbB:AddSlider("Trigger Button Size", 40, 110, TB.BtnSize, function(v) TB.BtnSize = v end, 2)
+		tbB:AddButton("Reset Trigger Button Position", function() resetPos() end)
+		tbB:AddLabel("Tap: toggles in Toggle mode, hold in Hold mode. Drag to move.")
+	end
+end
+
 local a2 = AimTab:AddSection("Hitbox Integration")
 a2:AddToggle("Hitbox Enabled", false, function(on) Hit.Enabled = on end)
 a2:AddToggle("Head", false, function(on) Hit.Groups.Head = on end)
