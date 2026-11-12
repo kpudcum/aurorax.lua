@@ -2238,49 +2238,20 @@ function INV.row(g, n, tag, txt, c, ts, ih, tagW, dim)
 	if not nm.Visible then nm.Visible = true end
 end
 
-INV.KEYS = { 'inv', 'item', 'hotbar', 'tool', 'loadout', 'weapon', 'backpack' }
-function INV.folderLike(n)
-	n = string.lower(n)
-	for _, k in ipairs(INV.KEYS) do
-		if string.find(n, k, 1, true) then return true end
-	end
-	return false
-end
-
 function INV.scan(model, player)
 	local held, count, order = nil, {}, {}
-	local function add(name)
-		if not count[name] then count[name] = 0; order[#order + 1] = name end
-		count[name] = count[name] + 1
-	end
 	local function sc(c, isChar)
 		if not c then return end
 		for _, t in ipairs(c:GetChildren()) do
 			if t:IsA('Tool') then
 				if isChar and not held then held = t.Name end
-				add(t.Name)
-			end
-		end
-	end
-	-- Backpack baskalarina replike olmaz: oyunlarin kendi envanter klasorlerini (Inventory/Items/Hotbar...) da tara
-	local function sc2(c)
-		if not c then return end
-		for _, f in ipairs(c:GetChildren()) do
-			if (f:IsA('Folder') or f:IsA('Configuration')) and INV.folderLike(f.Name) then
-				for _, g in ipairs(f:GetChildren()) do
-					local nm = g.Name
-					if g:IsA('StringValue') and g.Value ~= '' then nm = g.Value end
-					if g:IsA('Tool') or g:IsA('ValueBase') or g:IsA('Folder') or g:IsA('Model') then add(nm) end
-				end
+				if not count[t.Name] then count[t.Name] = 0; order[#order + 1] = t.Name end
+				count[t.Name] = count[t.Name] + 1
 			end
 		end
 	end
 	sc(model, true)
-	if player then
-		sc(player:FindFirstChildOfClass('Backpack'), false)
-		sc2(player)
-	end
-	sc2(model)
+	if player then sc(player:FindFirstChildOfClass('Backpack'), false) end
 	local names = {}
 	for i = 1, math.min(24, #order) do
 		local n = order[i]
@@ -2293,7 +2264,7 @@ function INV.draw(d, g, x, y, ts, far, c)
 	ts = math.max(7, math.floor(ts * ESP.InvScale / 100 + .5))
 	local ih = ts + 3
 	local tagW = math.floor(ts * 3.6)
-	local tr = false
+	local tr = Lang == 'tr'
 	local n = 0
 	if ESP.HeldItem then
 		n = n + 1
@@ -2323,7 +2294,7 @@ function INV.draw(d, g, x, y, ts, far, c)
 		if nm.Visible then nm.Visible = false end
 	end
 	if n == 0 then show(g, false) return 0 end
-	local cw = math.clamp(math.floor(ts * 12 + 10), 70, 260)
+	local cw = math.clamp(math.floor(ts * 13), 104, 230)
 	g.card.Size = UDim2.fromOffset(cw, n * ih + 6)
 	g.card.Position = UDim2.fromOffset(x - math.floor(cw * .5), y)
 	g.st.Color = c; g.bar.BackgroundColor3 = c
@@ -2549,9 +2520,8 @@ local function drawESP(d, cam, camCF)
 	x1, y1, x2, y2 = math.floor(x1 + .5), math.floor(y1 + .5), math.floor(x2 + .5), math.floor(y2 + .5)
 	mx = math.floor(mx + .5); w = x2 - x1; h = y2 - y1
 	local far = h < 30 or d.dist > 300
-	-- yazi/kart boyutu hedefin ekrandaki boyuyla orantili: uzaklastikca kuculur, yaklastikca buyur
-	local sc = math.clamp(h / 120, 0.6, 1.1)
-	local ts = math.max(8, math.floor(ESP.TextSize * sc + .5))
+	local ts = ESP.TextSize
+	if far then ts = math.max(8, ts - 2) end
 
 	if ESP.Box then
 		local g = grp(d, 'box', buildBox)
@@ -2610,9 +2580,9 @@ local function drawESP(d, cam, camCF)
 		show(d.g.dist, false)
 	end
 
-	if (ESP.HeldItem or ESP.Inventory) and h >= 12 then
+	if (ESP.HeldItem or ESP.Inventory) and h >= 20 then
 		local g = grp(d, 'inv', INV.build)
-		INV.draw(d, g, mx, by + 2, ts, h < 18, c)
+		INV.draw(d, g, mx, by + 2, ts, far, c)
 	else
 		show(d.g.inv, false)
 	end
@@ -4530,8 +4500,8 @@ do
 				local hum = c and c:FindFirstChildOfClass("Humanoid")
 				local rt = c and c:FindFirstChild("HumanoidRootPart")
 				if hum and rt and hum.Health > 0 then
-					local mate = lp.Team ~= nil and pl.Team == lp.Team
-					if R.Team or not mate then
+					local mate = lp.Team ~= nil and not lp.Neutral and pl.Team == lp.Team
+					if not mate or (R.Team and not ESP.TeamCheck) then
 						local col = mate and Color3.fromRGB(80, 225, 140) or (ESP.Rainbow and rainbow or Color3.fromRGB(255, 80, 95))
 						local dd = place(pl, rt, fwd, right, mine, col, pl.DisplayName)
 						if dd and not mate and dd < near then near, nearName = dd, pl.DisplayName end
