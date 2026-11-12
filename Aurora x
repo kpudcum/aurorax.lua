@@ -4412,6 +4412,204 @@ end)
 
 
 do
+	local fcS = Visuals:AddSection("Freecam")
+	local FC = { On = false, Speed = 50, Fast = 3, Smooth = 35, Sens = 0.3, Key = { kind = "key", value = Enum.KeyCode.P },
+		yaw = 0, pitch = 0, cyaw = 0, cpitch = 0, pos = Vector3.new(0, 0, 0), vel = Vector3.new(0, 0, 0), saved = nil,
+		mv = Vector2.new(0, 0), up = 0, look = Vector2.new(0, 0), ui = nil, rmb = false, cn = {} }
+	local CAS = game:GetService("ContextActionService")
+	local fcToggle = nil
+	local stopFC
+	local K = Enum.KeyCode
+
+	local function controls()
+		local ok, c = pcall(function()
+			return require(lp:WaitForChild("PlayerScripts"):WaitForChild("PlayerModule")):GetControls()
+		end)
+		return ok and c or nil
+	end
+	local function sink() return Enum.ContextActionResult.Sink end
+
+	-- mobil: sol joystick (hareket), sag tarafa surukle (bakis), yukari/asagi butonlari ve cikis
+	local function buildMobileUI()
+		local vp = workspace.CurrentCamera.ViewportSize
+		local root = new("Frame", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, BorderSizePixel = 0, Active = false, ZIndex = 50 })
+		local conns2 = {}
+		local base = new("Frame", { Size = UDim2.fromOffset(130, 130), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromOffset(100, vp.Y - 110), BackgroundColor3 = T.card, BackgroundTransparency = 0.35, BorderSizePixel = 0, Active = true, ZIndex = 51 }, { corner(65) })
+		local bst = stroke(accent, 2, 0.3)
+		bst.Parent = base
+		onAccent(function(a) bst.Color = a end)
+		local knob = new("Frame", { Size = UDim2.fromOffset(56, 56), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), BackgroundColor3 = accent, BackgroundTransparency = 0.15, BorderSizePixel = 0, ZIndex = 52 }, { corner(28) })
+		onAccent(function(a) knob.BackgroundColor3 = a end)
+		knob.Parent = base
+		base.Parent = root
+		local jIn, jStart, lookIn = nil, nil, nil
+		base.InputBegan:Connect(function(i)
+			if i.UserInputType == Enum.UserInputType.Touch and not jIn then
+				jIn, jStart = i, i.Position
+			end
+		end)
+		table.insert(conns2, UIS.InputChanged:Connect(function(i)
+			if i == jIn then
+				local d = Vector2.new(i.Position.X - jStart.X, i.Position.Y - jStart.Y) / 60
+				if d.Magnitude > 1 then d = d.Unit end
+				FC.mv = d
+				knob.Position = UDim2.new(0.5, d.X * 45, 0.5, d.Y * 45)
+			elseif i == lookIn then
+				FC.look = FC.look + Vector2.new(i.Delta.X, i.Delta.Y)
+			end
+		end))
+		table.insert(conns2, UIS.InputBegan:Connect(function(i, gp)
+			if gp or i.UserInputType ~= Enum.UserInputType.Touch or lookIn or i == jIn then return end
+			if i.Position.X > vp.X * 0.35 then lookIn = i end
+		end))
+		table.insert(conns2, UIS.InputEnded:Connect(function(i)
+			if i == jIn then
+				jIn = nil
+				FC.mv = Vector2.new(0, 0)
+				knob.Position = UDim2.fromScale(0.5, 0.5)
+			elseif i == lookIn then
+				lookIn = nil
+			end
+		end))
+		local function mkBtn(txt, y, setter)
+			local b = new("TextButton", { Text = "", AutoButtonColor = false, AnchorPoint = Vector2.new(0.5, 0.5), Size = UDim2.fromOffset(52, 52), Position = UDim2.fromOffset(vp.X - 50, vp.Y - y), BackgroundColor3 = T.card, BackgroundTransparency = 0.25, BorderSizePixel = 0, ZIndex = 51 }, { corner(26) })
+			local st = stroke(accent, 2, 0.2)
+			st.Parent = b
+			onAccent(function(a) st.Color = a end)
+			label({ Text = txt, Font = Enum.Font.GothamBlack, TextSize = 22, TextColor3 = T.text, TextXAlignment = Enum.TextXAlignment.Center, Size = UDim2.fromScale(1, 1), ZIndex = 52 }).Parent = b
+			b.InputBegan:Connect(function(i)
+				if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then setter(true) end
+			end)
+			b.InputEnded:Connect(function(i)
+				if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then setter(false) end
+			end)
+			b.Parent = root
+		end
+		mkBtn("^", 150, function(v) FC.up = v and 1 or (FC.up == 1 and 0 or FC.up) end)
+		mkBtn("v", 80, function(v) FC.up = v and -1 or (FC.up == -1 and 0 or FC.up) end)
+		local ex = new("TextButton", { Text = "", AutoButtonColor = false, AnchorPoint = Vector2.new(0.5, 0), Size = UDim2.fromOffset(130, 30), Position = UDim2.fromOffset(vp.X / 2, 64), BackgroundColor3 = T.card, BackgroundTransparency = 0.2, BorderSizePixel = 0, ZIndex = 51 }, { corner(15) })
+		local est = stroke(T.err, 1.5, 0.2)
+		est.Parent = ex
+		label({ Text = "EXIT FREECAM", Font = Enum.Font.GothamBold, TextSize = 11, TextColor3 = T.text, TextXAlignment = Enum.TextXAlignment.Center, Size = UDim2.fromScale(1, 1), ZIndex = 52 }).Parent = ex
+		ex.MouseButton1Click:Connect(function()
+			if fcToggle then fcToggle.Set(false) else stopFC() end
+		end)
+		ex.Parent = root
+		root.Parent = gui
+		return { root = root, conns = conns2 }
+	end
+
+	local function step(dt)
+		local cam = workspace.CurrentCamera
+		if not cam then return end
+		if cam.CameraType ~= Enum.CameraType.Scriptable then cam.CameraType = Enum.CameraType.Scriptable end
+		local typing = UIS:GetFocusedTextBox() ~= nil
+		local mx, mz, my, fast = 0, 0, 0, 1
+		if AIM_MOBILE then
+			mx, mz, my = FC.mv.X, -FC.mv.Y, FC.up
+			local d = FC.look
+			FC.look = Vector2.new(0, 0)
+			FC.yaw = FC.yaw - math.rad(d.X * FC.Sens * 1.4)
+			FC.pitch = math.clamp(FC.pitch - math.rad(d.Y * FC.Sens * 1.4), -1.5, 1.5)
+		else
+			if not typing then
+				if UIS:IsKeyDown(K.W) then mz = mz + 1 end
+				if UIS:IsKeyDown(K.S) then mz = mz - 1 end
+				if UIS:IsKeyDown(K.D) then mx = mx + 1 end
+				if UIS:IsKeyDown(K.A) then mx = mx - 1 end
+				if UIS:IsKeyDown(K.Space) or UIS:IsKeyDown(K.E) then my = my + 1 end
+				if UIS:IsKeyDown(K.LeftControl) or UIS:IsKeyDown(K.Q) then my = my - 1 end
+				if UIS:IsKeyDown(K.LeftShift) then fast = FC.Fast end
+			end
+			-- sag tik basili tutarak bakilir (imlec kilitlenir), birakinca menu kullanilabilir
+			local rmb = (not typing) and UIS:IsMouseButtonPressed(Enum.UserInputType.MouseButton2)
+			if rmb ~= FC.rmb then
+				FC.rmb = rmb
+				UIS.MouseBehavior = rmb and Enum.MouseBehavior.LockCurrentPosition or Enum.MouseBehavior.Default
+			end
+			if rmb then
+				local d = UIS:GetMouseDelta()
+				FC.yaw = FC.yaw - math.rad(d.X * FC.Sens)
+				FC.pitch = math.clamp(FC.pitch - math.rad(d.Y * FC.Sens), -1.5, 1.5)
+			end
+		end
+		local k = 40 - 0.35 * FC.Smooth
+		local a = 1 - math.exp(-dt * k)
+		FC.cyaw = FC.cyaw + (FC.yaw - FC.cyaw) * a
+		FC.cpitch = FC.cpitch + (FC.pitch - FC.cpitch) * a
+		local rot = CFrame.fromOrientation(FC.cpitch, FC.cyaw, 0)
+		local dir = rot.LookVector * mz + rot.RightVector * mx + Vector3.new(0, my, 0)
+		local target = Vector3.new(0, 0, 0)
+		if dir.Magnitude > 0.01 then target = dir.Unit * math.min(dir.Magnitude, 1) * FC.Speed * fast end
+		FC.vel = FC.vel:Lerp(target, 1 - math.exp(-dt * k * 0.6))
+		FC.pos = FC.pos + FC.vel * dt
+		cam.CFrame = CFrame.new(FC.pos) * rot
+	end
+
+	local function startFC()
+		local cam = workspace.CurrentCamera
+		if not cam or FC.On then return end
+		FC.saved = { type = cam.CameraType, subject = cam.CameraSubject, cf = cam.CFrame }
+		local rx, ry = cam.CFrame:ToOrientation()
+		FC.pitch, FC.yaw, FC.cpitch, FC.cyaw = rx, ry, rx, ry
+		FC.pos = cam.CFrame.Position
+		FC.vel = Vector3.new(0, 0, 0)
+		FC.mv, FC.up, FC.look, FC.rmb = Vector2.new(0, 0), 0, Vector2.new(0, 0), false
+		cam.CameraType = Enum.CameraType.Scriptable
+		-- karakter yerinde kalsin: oyun kontrolleri kapatilir, tuslar sink edilir
+		local c = controls()
+		if c then pcall(function() c:Disable() end) end
+		pcall(function()
+			CAS:BindActionAtPriority("AuroraFreecamSink", sink, false, Enum.ContextActionPriority.High.Value, K.W, K.A, K.S, K.D, K.Space, K.Q, K.E, K.LeftControl, K.LeftShift)
+		end)
+		FC.On = true
+		if AIM_MOBILE then FC.ui = buildMobileUI() end
+		RunService:BindToRenderStep("AuroraFreecam", Enum.RenderPriority.Camera.Value + 1, step)
+		Aurora:Notify("Freecam", AIM_MOBILE and "Left stick: move. Drag right side: look." or "WASD move, Space/Ctrl up/down, Shift fast. Hold right mouse to look.", 3.5, "success")
+	end
+	stopFC = function()
+		if not FC.On then return end
+		FC.On = false
+		pcall(function() RunService:UnbindFromRenderStep("AuroraFreecam") end)
+		pcall(function() CAS:UnbindAction("AuroraFreecamSink") end)
+		local c = controls()
+		if c then pcall(function() c:Enable() end) end
+		pcall(function() UIS.MouseBehavior = Enum.MouseBehavior.Default end)
+		if FC.ui then
+			for _, cn in ipairs(FC.ui.conns) do cn:Disconnect() end
+			FC.ui.root:Destroy()
+			FC.ui = nil
+		end
+		local cam = workspace.CurrentCamera
+		if cam and FC.saved then
+			cam.CameraType = (FC.saved.type == Enum.CameraType.Scriptable) and Enum.CameraType.Custom or FC.saved.type
+			local hum = lp.Character and lp.Character:FindFirstChildOfClass("Humanoid")
+			cam.CameraSubject = FC.saved.subject or hum
+		end
+	end
+	gui.Destroying:Connect(stopFC)
+
+	fcToggle = fcS:AddToggle("Freecam", false, function(on)
+		if on then startFC() else stopFC() end
+	end)
+	if not AIM_MOBILE then
+		fcS:AddKeybind("Freecam Key", FC.Key, function(b)
+			if type(b) == "table" then FC.Key = b end
+			FC.skip = os.clock() + 0.5
+		end)
+		FC.skip = 0
+		table.insert(conns, UIS.InputBegan:Connect(function(i)
+			if os.clock() < FC.skip or UIS:GetFocusedTextBox() then return end
+			if matchesKey(i, FC.Key) then fcToggle.Set(not fcToggle.Get()) end
+		end))
+	end
+	fcS:AddSlider("Freecam Speed", 5, 300, 50, function(v) FC.Speed = v end)
+	fcS:AddSlider("Fast Multiplier (Shift)", 1, 8, 3, function(v) FC.Fast = v end, 0.5)
+	fcS:AddSlider("Smoothness", 0, 100, 35, function(v) FC.Smooth = v end)
+	fcS:AddSlider("Look Sensitivity", 0.1, 1.5, 0.3, function(v) FC.Sens = v end, 0.05)
+end
+
+do
 	local fbS = Visuals:AddSection("Fullbright")
 	local FB = { On = false, Str = 0.75, Fog = true, Shadows = true, Conn = nil, Orig = nil, PrevEnf = nil, acc = 0 }
 	local function put(prop, val)
