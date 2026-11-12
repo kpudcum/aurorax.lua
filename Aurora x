@@ -3182,87 +3182,112 @@ hCredits:AddCredit("3qr311", "Scripter")
 
 -- 2. PLAYER SEKME
 local Player = Window:AddTab("Player", "o")
-local p1 = Player:AddSection("Movement")
-p1:AddSlider("Walk Speed", 16, 120, 16, function(v)
-	customWalkSpeed = v
-	walkSpeedEnabled = (v ~= 16)
-	local char = lp.Character
-	local h = char and char:FindFirstChildOfClass("Humanoid")
-	if h then h.WalkSpeed = v end
-end)
-p1:AddSlider("Jump Power", 50, 250, 50, function(v)
-	customJumpPower = v
-	jumpPowerEnabled = true
-	local char = lp.Character
-	local h = char and char:FindFirstChildOfClass("Humanoid")
-	if h then h.UseJumpPower = true h.JumpPower = v end
-end)
-p1:AddSlider("Gravity", 50, 300, math.floor(workspace.Gravity), function(v) workspace.Gravity = v end)
-p1:AddToggle("Sit", false, function(on)
-	local char = lp.Character
-	local h = char and char:FindFirstChildOfClass("Humanoid")
-	if h then h.Sit = on end
-end)
-
 do
-	local pSb = Player:AddSection("Speed & Jump Bypass")
-	local SB = { Speed = false, Spd = 40, Jump = false, Jmp = 90 }
-	local function parts()
+	local pMv = Player:AddSection("Movement")
+	local MV = { SpeedMode = "Bypass", Speed = 16, JumpMode = "Bypass", Jump = 50, SB = false, JB = false, WasN = false, WasJ = false, BH = false, Boost = 12 }
+	local function myHum()
+		local char = lp.Character
+		return char and char:FindFirstChildOfClass("Humanoid")
+	end
+	-- Normal: Humanoid.WalkSpeed degeri yazilir (oyun geri alirsa surekli uygulanir). Bypass: WalkSpeed'e dokunmadan CFrame ile ilerletir
+	local function applySpeed()
+		local h = myHum()
+		if MV.SpeedMode == "Normal" then
+			customWalkSpeed = MV.Speed
+			walkSpeedEnabled = (MV.Speed ~= 16)
+			MV.SB = false
+			MV.WasN = true
+			if h then h.WalkSpeed = MV.Speed end
+		else
+			walkSpeedEnabled = false
+			MV.SB = MV.Speed > 16
+			if MV.WasN and h then h.WalkSpeed = 16 end
+			MV.WasN = false
+		end
+	end
+	-- Normal: JumpPower yazilir. Bypass: JumpPower'a dokunmadan ziplama aninda yukari hiz verir
+	local function applyJump()
+		local h = myHum()
+		if MV.JumpMode == "Normal" then
+			customJumpPower = MV.Jump
+			jumpPowerEnabled = (MV.Jump ~= 50)
+			MV.JB = false
+			MV.WasJ = true
+			if h then
+				h.UseJumpPower = true
+				h.JumpPower = MV.Jump
+			end
+		else
+			jumpPowerEnabled = false
+			MV.JB = MV.Jump > 50
+			if MV.WasJ and h then
+				h.UseJumpPower = true
+				h.JumpPower = 50
+			end
+			MV.WasJ = false
+		end
+	end
+	pMv:AddDropdown("Speed Mode", { "Bypass", "Normal" }, "Bypass", function(o)
+		MV.SpeedMode = o
+		applySpeed()
+	end)
+	pMv:AddSlider("Walk Speed", 16, 300, 16, function(v)
+		MV.Speed = v
+		applySpeed()
+	end)
+	pMv:AddDropdown("Jump Mode", { "Bypass", "Normal" }, "Bypass", function(o)
+		MV.JumpMode = o
+		applyJump()
+	end)
+	pMv:AddSlider("Jump Power", 50, 300, 50, function(v)
+		MV.Jump = v
+		applyJump()
+	end)
+	pMv:AddSlider("Gravity", 50, 300, math.floor(workspace.Gravity), function(v) workspace.Gravity = v end)
+	pMv:AddToggle("Bunny Hop", false, function(on) MV.BH = on end)
+	pMv:AddSlider("Bunny Hop Boost", 0, 60, 12, function(v) MV.Boost = v end)
+	pMv:AddToggle("Sit", false, function(on)
+		local h = myHum()
+		if h then h.Sit = on end
+	end)
+	pMv:AddLabel("Bypass mode moves you without changing WalkSpeed/JumpPower, so the game cannot see or reset it.")
+
+	table.insert(conns, RunService.Heartbeat:Connect(function(dt)
+		if Aurora.FlyFlag.On then return end
+		if not MV.SB and not MV.BH then return end
 		local char = lp.Character
 		local hum = char and char:FindFirstChildOfClass("Humanoid")
 		local root = char and (char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso"))
-		return hum, root
-	end
-	pSb:AddToggle("Speed Bypass (CFrame)", false, function(on) SB.Speed = on end)
-	pSb:AddSlider("Bypass Speed", 16, 300, 40, function(v) SB.Spd = v end)
-	pSb:AddToggle("Jump Bypass (Velocity)", false, function(on) SB.Jump = on end)
-	pSb:AddSlider("Bypass Jump Power", 50, 300, 90, function(v) SB.Jmp = v end)
-	-- WalkSpeed/JumpPower'a dokunmaz: hareket kendi koordinat/hiz uzerinden eklenir, oyun degeri geri alsa da calisir
-	table.insert(conns, RunService.Heartbeat:Connect(function(dt)
-		if not SB.Speed or Aurora.FlyFlag.On then return end
-		local hum, root = parts()
 		if not hum or not root or hum.Health <= 0 or hum.Sit then return end
 		local md = hum.MoveDirection
 		if md.Magnitude < 0.1 then return end
-		local extra = SB.Spd - hum.WalkSpeed
-		if extra <= 0 then return end
-		root.CFrame = root.CFrame + md.Unit * (extra * dt)
+		if MV.SB then
+			local extra = MV.Speed - hum.WalkSpeed
+			if extra > 0 then root.CFrame = root.CFrame + md.Unit * (extra * dt) end
+		end
+		if MV.BH then
+			if hum.FloorMaterial ~= Enum.Material.Air then
+				hum:ChangeState(Enum.HumanoidStateType.Jumping)
+			elseif MV.Boost > 0 then
+				root.CFrame = root.CFrame + md.Unit * (MV.Boost * dt)
+			end
+		end
 	end))
 	table.insert(conns, UIS.JumpRequest:Connect(function()
-		if not SB.Jump then return end
-		local hum, root = parts()
+		if not MV.JB then return end
+		local char = lp.Character
+		local hum = char and char:FindFirstChildOfClass("Humanoid")
+		local root = char and (char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso"))
 		if not hum or not root or hum.Health <= 0 or hum.Sit then return end
 		if hum.FloorMaterial == Enum.Material.Air then return end
 		local v = root.AssemblyLinearVelocity
-		root.AssemblyLinearVelocity = Vector3.new(v.X, SB.Jmp, v.Z)
-	end))
-end
-
-do
-	local pBh = Player:AddSection("Bunny Hop")
-	local BH = { On = false, Boost = 12 }
-	pBh:AddToggle("Bunny Hop", false, function(on) BH.On = on end)
-	pBh:AddSlider("Air Boost", 0, 60, 12, function(v) BH.Boost = v end)
-	-- hareket ederken yere degdigi an otomatik ziplar, havadayken hafif ek hiz verir
-	table.insert(conns, RunService.Heartbeat:Connect(function(dt)
-		if not BH.On or Aurora.FlyFlag.On then return end
-		local char = lp.Character
-		local hum = char and char:FindFirstChildOfClass("Humanoid")
-		local root = char and char:FindFirstChild("HumanoidRootPart")
-		if not hum or not root or hum.Health <= 0 or hum.Sit then return end
-		local md = hum.MoveDirection
-		if md.Magnitude < 0.1 then return end
-		if hum.FloorMaterial ~= Enum.Material.Air then
-			hum:ChangeState(Enum.HumanoidStateType.Jumping)
-		elseif BH.Boost > 0 then
-			root.CFrame = root.CFrame + md.Unit * (BH.Boost * dt)
-		end
+		root.AssemblyLinearVelocity = Vector3.new(v.X, MV.Jump, v.Z)
 	end))
 end
 
 Aurora.FlyFlag = { On = false } -- Fly acikken Noclip Float yukseklik kontrolunu birakir
 do
-	local pNc = Player:AddSection("Noclip & Jump")
+	local pNc = Player:AddSection("Noclip & Infinite Jump")
 	local NC = { On = false, Float = true }
 	local touched = setmetatable({}, { __mode = "k" })
 	local ncConn = nil
@@ -3873,7 +3898,10 @@ v1:AddDropdown("Time of day", { "Morning", "Noon", "Evening", "Night" }, "Noon",
 	enforcedClockTime = times[o] or 14
 	Lighting.ClockTime = enforcedClockTime
 end)
-v1:AddToggle("Bright mode", false, function(on) Lighting.Brightness = on and 3 or 1 end)
+v1:AddColorPicker("Ambient color", Color3.fromRGB(140, 140, 160), function(c)
+	enforcedAmbient = c
+	Lighting.Ambient = c
+end)
 
 
 do
@@ -3942,7 +3970,7 @@ do
 end
 
 do
-	local xhS = Visuals:AddSection("Crosshair")
+	local xhS = Visuals:AddSection("Crosshair", true)
 	local XH = { On = false, Style = "Cross + Dot", Color = Color3.fromRGB(255, 255, 255), Rainbow = false, Accent = false, Len = 10, Gap = 4, Th = 2, Op = 1, Outline = true, Spin = false, Conn = nil }
 	local accCol = Color3.fromRGB(139, 108, 255)
 	onAccent(function(a) accCol = a end)
@@ -4050,7 +4078,7 @@ do
 	refresh()
 end
 
-local v3 = Visuals:AddSection("Custom Sky")
+local v3 = Visuals:AddSection("Custom Sky", true)
 v3:AddDropdown("Sky Preset", SkyAPI.Order, "Default", function(o)
 	SkyAPI.Set(o)
 	Aurora:Notify("Custom Sky", T_("Sky: ") .. tostring(o), 2.5)
@@ -4069,12 +4097,6 @@ v3:AddSlider("Sky Time (hour)", 0, 24, 12, function(v) SkyAPI.SetClock(v) end, 0
 v3:AddButton("Reset Sky", function()
 	SkyAPI.Reset()
 	Aurora:Notify("Custom Sky", "Sky reset", 2.5)
-end)
-
-local v2 = Visuals:AddSection("Colors")
-v2:AddColorPicker("Ambient color", Color3.fromRGB(140, 140, 160), function(c)
-	enforcedAmbient = c
-	Lighting.Ambient = c
 end)
 
 -- 3b. TELEPORT SEKME
@@ -4427,13 +4449,29 @@ e2:AddToggle("Corners", false, function(on) ESP.Corners = on end)
 e2:AddSlider("Thickness", 1, 10, 3, function(v) ESP.Thickness = v end)
 e2:AddToggle("3D Box", false, function(on) ESP.Box3D = on end)
 
-local e3 = ESPTab:AddSection("Tracers & Arrows")
+local e3 = ESPTab:AddSection("Tracers & Skeleton")
 e3:AddToggle("Tracer", false, function(on) ESP.Tracer = on end)
 e3:AddDropdown("Tracer From", { "Bottom", "Middle", "Top" }, "Bottom", function(o)
 	ESP.TracerFrom = (o == "Bottom" and 1) or (o == "Middle" and 2) or 3
 end)
-e3:AddToggle("Arrows", false, function(on) ESP.Arrows = on end)
+e3:AddToggle("Off-screen Arrows", false, function(on) ESP.Arrows = on end)
 e3:AddToggle("Skeleton", false, function(on) ESP.Skeleton = on end)
+
+local eInv = ESPTab:AddSection("Inventory & Held Item", true)
+eInv:AddToggle("Held Item", false, function(on) ESP.HeldItem = on end)
+eInv:AddToggle("Inventory", false, function(on) ESP.Inventory = on end)
+eInv:AddSlider("Max Items", 1, 8, 4, function(v) ESP.InvMax = math.floor(v) end)
+eInv:AddSlider("Card Size (%)", 50, 200, 100, function(v) ESP.InvScale = math.floor(v) end)
+
+local e4 = ESPTab:AddSection("NPC ESP")
+e4:AddToggle("NPC Enabled", false, function(on)
+	ESP.NPC = on
+	if on then scanNPCs() end
+end)
+
+local e5 = ESPTab:AddSection("Colors")
+e5:AddColorPicker("ESP Color", ESP.Color, function(c) ESP.Color = c end)
+e5:AddToggle("Rainbow Color", false, function(on) ESP.Rainbow = on end)
 
 do
 	local eRad = ESPTab:AddSection("Radar")
@@ -4671,23 +4709,6 @@ do
 	eRad:AddToggle("Lock Position", false, function(on) R.Lock = on end)
 end
 
-local eInv = ESPTab:AddSection("Inventory & Held Item")
-eInv:AddToggle("Held Item", false, function(on) ESP.HeldItem = on end)
-eInv:AddToggle("Inventory", false, function(on) ESP.Inventory = on end)
-eInv:AddSlider("Max Items", 1, 8, 4, function(v) ESP.InvMax = math.floor(v) end)
-eInv:AddSlider("Card Size (%)", 50, 200, 100, function(v) ESP.InvScale = math.floor(v) end)
-
-local e4 = ESPTab:AddSection("NPC ESP")
-e4:AddToggle("NPC Enabled", false, function(on)
-	ESP.NPC = on
-	if on then scanNPCs() end
-end)
-
-local e5 = ESPTab:AddSection("Colors")
-e5:AddColorPicker("ESP Color", ESP.Color, function(c) ESP.Color = c end)
-
-local TimeDate = ESPTab:AddSection("Time & Date on ESP")
-TimeDate:AddToggle("Rainbow Color", false, function(on) ESP.Rainbow = on end)
 
 -- 6. AIMBOT & HITBOX SEKME
 local AimTab = Window:AddTab("Aimbot", "o")
@@ -4705,14 +4726,16 @@ if not AIM_MOBILE then -- telefonda klavye/fare yok, tus ayari gosterilmez (ekra
 end
 a1:AddDropdown("Aim Part", { "Head", "Chest", "Root", "Closest" }, "Head", function(o) Aim.Part = o end)
 a1:AddDropdown("Target Priority", { "Closest to cursor", "Closest distance", "Lowest health" }, "Closest to cursor", function(o) Aim.Priority = o end)
-a1:AddSlider("FOV Radius", 30, 600, 150, function(v) Aim.FOV = v end)
 a1:AddSlider("Max Distance", 50, 3000, 1000, function(v) Aim.MaxDistance = v end)
 a1:AddToggle("Team Check", false, function(on) Aim.TeamCheck = on end)
 a1:AddToggle("Wall Check", false, function(on) Aim.WallCheck = on end)
 a1:AddToggle("Sticky Target", true, function(on) Aim.Sticky = on end)
-a1:AddToggle("Show FOV", Aim.ShowFOV, function(on) Aim.ShowFOV = on end)
-a1:AddColorPicker("FOV Color", Aim.FOVColor, function(c) Aim.FOVColor = c end)
-a1:AddToggle("FOV Rainbow", false, function(on) Aim.FOVRainbow = on end)
+
+local aFov = AimTab:AddSection("Aim FOV")
+aFov:AddSlider("FOV Radius", 30, 600, 150, function(v) Aim.FOV = v end)
+aFov:AddToggle("Show FOV", Aim.ShowFOV, function(on) Aim.ShowFOV = on end)
+aFov:AddColorPicker("FOV Color", Aim.FOVColor, function(c) Aim.FOVColor = c end)
+aFov:AddToggle("FOV Rainbow", false, function(on) Aim.FOVRainbow = on end)
 
 local aTargets = AimTab:AddSection("Target Types")
 aTargets:AddToggle("Target Players", true, function(on) Aim.Players = on end)
@@ -4736,283 +4759,7 @@ if AIM_MOBILE then -- ekrandaki aim butonu ayarlari sadece telefonda gorunur
 	aBtn:AddLabel("Tap: toggles on/off in Toggle mode, hold in Hold mode. Drag to move.")
 end
 
-do
-	local TB = { Enabled = false, Mode = AIM_MOBILE and "Toggle" or "Hold", Key = { kind = "mouse", value = Enum.UserInputType.MouseButton2 },
-		Part = "Head", Method = "Auto", TeamCheck = true, NeedAim = false, Range = 600, DMin = 60, DMax = 140, CD = 120, Chance = 90,
-		ShowButton = true, BtnSize = AIM_MOBILE and 66 or 56 }
-	local tHold, tLatched, tBtnHold = false, false, false
-	local acquired, fireAt, nextOk = nil, 0, 0
-	local rp = RaycastParams.new()
-	rp.FilterType = Enum.RaycastFilterType.Exclude
-	rp.IgnoreWater = true
-	local VIM = nil
-	pcall(function() VIM = game:GetService("VirtualInputManager") end)
-
-	local function armed()
-		if not TB.Enabled then return false end
-		if TB.Mode == "Always" then return true end
-		if TB.Mode == "Toggle" then return tLatched end
-		return tHold or tBtnHold
-	end
-
-	-- vurulan parcadan karakter modelini bul (aksesuar/ic ice model olabilir)
-	local function resolve(inst)
-		local m = inst:FindFirstAncestorWhichIsA("Model")
-		while m and not m:FindFirstChildOfClass("Humanoid") do
-			m = m.Parent and m.Parent:FindFirstAncestorWhichIsA("Model") or nil
-		end
-		return m
-	end
-	local function partOk(inst)
-		if TB.Part == "Any" then return true end
-		if TB.Part == "Head" then return inst.Name == "Head" end
-		return inst.Name ~= "Head"
-	end
-	local function valid(m)
-		local hum = m:FindFirstChildOfClass("Humanoid")
-		if not hum or hum.Health <= 0 then return false end
-		local pl = Players:GetPlayerFromCharacter(m)
-		if pl then
-			if pl == lp or not Aim.Players then return false end
-			if TB.TeamCheck and lp.Team ~= nil and not lp.Neutral and pl.Team == lp.Team then return false end
-			return true
-		end
-		return Aim.NPC
-	end
-
-	-- nisangahtan ray at: duvar/engel varsa vurmaz (otomatik wall check); gorunmez/carpmayan parcalar atlanir
-	local function scan(cam, cursor)
-		local char = lp.Character
-		local ignore = {}
-		if char then ignore[1] = char end
-		local ray = cam:ViewportPointToRay(cursor.X, cursor.Y)
-		local dir = ray.Direction * TB.Range
-		for _ = 1, 5 do
-			rp.FilterDescendantsInstances = ignore
-			local res = workspace:Raycast(ray.Origin, dir, rp)
-			if not res then return nil end
-			local inst = res.Instance
-			local m = resolve(inst)
-			if m and m ~= char then return m, inst end
-			if inst.Transparency >= 0.9 or not inst.CanCollide then
-				table.insert(ignore, inst)
-			else
-				return nil
-			end
-		end
-		return nil
-	end
-
-	local function doTool()
-		local ch = lp.Character
-		local tool = ch and ch:FindFirstChildOfClass("Tool")
-		if tool then
-			pcall(function() tool:Activate() end)
-			return true
-		end
-		return false
-	end
-	local function doClick(x, y)
-		local ok = false
-		if VIM then
-			ok = pcall(function() VIM:SendMouseButtonEvent(x, y, 0, true, game, 0) end)
-			if ok then
-				task.delay(0.02 + math.random() * 0.04, function()
-					pcall(function() VIM:SendMouseButtonEvent(x, y, 0, false, game, 0) end)
-				end)
-			end
-		end
-		if not ok then pcall(function() mouse1click() end) end
-	end
-	local function fire(cursor)
-		if TB.Method == "Tool Activate" then
-			doTool()
-		elseif TB.Method == "Mouse Click" then
-			doClick(cursor.X, cursor.Y)
-		else
-			if not doTool() then doClick(cursor.X, cursor.Y) end
-		end
-	end
-
-	table.insert(conns, RunService.Heartbeat:Connect(function()
-		if not armed() then acquired = nil return end
-		if TB.NeedAim and not isAiming() then acquired = nil return end
-		if UIS:GetFocusedTextBox() then return end
-		local cam = workspace.CurrentCamera
-		local char = lp.Character
-		local myHum = char and char:FindFirstChildOfClass("Humanoid")
-		if not cam or not myHum or myHum.Health <= 0 then acquired = nil return end
-		local cursor = getCursor(cam)
-		local m, inst = scan(cam, cursor)
-		if not m or not valid(m) or not partOk(inst) then acquired = nil return end
-		local now = os.clock()
-		-- yeni hedefte rastgele tepki suresi: anlik ates tespit edilmeyi kolaylastirir
-		if acquired ~= m then
-			acquired = m
-			local lo, hi = TB.DMin, math.max(TB.DMax, TB.DMin)
-			fireAt = now + (lo + math.random() * (hi - lo)) / 1000
-		end
-		if now < fireAt or now < nextOk then return end
-		nextOk = now + (TB.CD * (0.85 + math.random() * 0.3)) / 1000
-		if math.random() * 100 > TB.Chance then return end
-		fire(cursor)
-	end))
-
-	table.insert(conns, UIS.InputBegan:Connect(function(input, gp)
-		if gp then return end
-		if matchesKey(input, TB.Key) then
-			tHold = true
-			if TB.Mode == "Toggle" then tLatched = not tLatched end
-		end
-	end))
-	table.insert(conns, UIS.InputEnded:Connect(function(input)
-		if matchesKey(input, TB.Key) then tHold = false end
-	end))
-
-	------------------------------------------------ UI
-	local tbS = AimTab:AddSection("Triggerbot")
-	tbS:AddToggle("Enable Triggerbot", false, function(on)
-		TB.Enabled = on
-		acquired = nil
-		if not on then tLatched, tBtnHold, tHold = false, false, false end
-	end)
-	tbS:AddDropdown("Trigger Mode", { "Hold", "Toggle", "Always" }, TB.Mode, function(o)
-		TB.Mode = o
-		tLatched, tBtnHold, tHold = false, false, false
-	end)
-	if not AIM_MOBILE then
-		tbS:AddKeybind("Trigger Key", TB.Key, function(b)
-			TB.Key = b
-			tHold, tLatched = false, false
-		end)
-	end
-	tbS:AddDropdown("Trigger Part", { "Head", "Body", "Any" }, "Head", function(o) TB.Part = o end)
-	tbS:AddDropdown("Fire Method", { "Auto", "Tool Activate", "Mouse Click" }, "Auto", function(o) TB.Method = o end)
-	tbS:AddToggle("Team Check", true, function(on) TB.TeamCheck = on end)
-	tbS:AddToggle("Require Aimbot Active", false, function(on) TB.NeedAim = on end)
-	tbS:AddSlider("Max Range", 20, 2000, 600, function(v) TB.Range = v end)
-	tbS:AddLabel("Uses Target Types (Players / NPCs) from below. Walls block shots automatically.")
-
-	local tbH = AimTab:AddSection("Triggerbot Humanizer")
-	tbH:AddSlider("Reaction Min (ms)", 0, 500, 60, function(v) TB.DMin = v end)
-	tbH:AddSlider("Reaction Max (ms)", 0, 800, 140, function(v) TB.DMax = v end)
-	tbH:AddSlider("Fire Delay (ms)", 40, 1000, 120, function(v) TB.CD = v end)
-	tbH:AddSlider("Hit Chance (%)", 10, 100, 90, function(v) TB.Chance = v end)
-	tbH:AddLabel("Random reaction time and skipped shots look human. Lower chance = safer.")
-
-	------------------------------------------------ MOBIL TRIGGER BUTONU (sadece telefonda)
-	if AIM_MOBILE then
-		local tbBtn = new("TextButton", {
-			Name = "TriggerButton", Text = "", AutoButtonColor = false, AnchorPoint = Vector2.new(0.5, 0.5),
-			Size = UDim2.fromOffset(TB.BtnSize, TB.BtnSize), BackgroundColor3 = T.card, BorderSizePixel = 0, Visible = false, ZIndex = 40,
-		}, { new("UICorner", { CornerRadius = UDim.new(0.5, 0) }) })
-		local tScale = new("UIScale", { Scale = 1 })
-		tScale.Parent = tbBtn
-		local tRing = stroke(accent, 2, 0.1)
-		onAccent(function(a) tRing.Color = a end)
-		tRing.Parent = tbBtn
-		local tFill = new("Frame", { Size = UDim2.fromScale(1, 1), BackgroundColor3 = Color3.new(1, 1, 1), BackgroundTransparency = 1, BorderSizePixel = 0, ZIndex = 41 }, { new("UICorner", { CornerRadius = UDim.new(0.5, 0) }) })
-		accentGrad(tFill, 45)
-		tFill.Parent = tbBtn
-		local tMain = new("TextLabel", {
-			Text = "TRIG", Font = Enum.Font.GothamBlack, TextScaled = true, BackgroundTransparency = 1, TextColor3 = T.text,
-			Size = UDim2.fromScale(0.8, 0.34), Position = UDim2.fromScale(0.1, 0.2), ZIndex = 42,
-		}, { new("UITextSizeConstraint", { MaxTextSize = 17, MinTextSize = 8 }) })
-		tMain.Parent = tbBtn
-		local tSub = new("TextLabel", {
-			Text = "OFF", Font = Enum.Font.GothamBold, TextScaled = true, BackgroundTransparency = 1, TextColor3 = T.sub,
-			Size = UDim2.fromScale(0.7, 0.2), Position = UDim2.fromScale(0.15, 0.56), ZIndex = 42,
-		}, { new("UITextSizeConstraint", { MaxTextSize = 11, MinTextSize = 6 }) })
-		tSub.Parent = tbBtn
-		tbBtn.Parent = gui
-
-		local function viewport()
-			local cam = workspace.CurrentCamera
-			return cam and cam.ViewportSize or Vector2.new(1280, 720)
-		end
-		local function resetPos()
-			local vp = viewport()
-			tbBtn.Position = UDim2.fromOffset(vp.X - 70, vp.Y * 0.6 + Aim.ButtonSize + 18)
-		end
-		resetPos()
-
-		local pressed, dragged = false, false
-		local startIn, startPos, moveInput = nil, Vector2.new(0, 0), nil
-		tbBtn.InputBegan:Connect(function(i)
-			if i.UserInputType ~= Enum.UserInputType.MouseButton1 and i.UserInputType ~= Enum.UserInputType.Touch then return end
-			pressed, dragged = true, false
-			startIn = i.Position
-			moveInput = i
-			startPos = Vector2.new(tbBtn.Position.X.Offset, tbBtn.Position.Y.Offset)
-			tween(tScale, 0.1, { Scale = 0.92 })
-			task.delay(0.08, function()
-				if pressed and not dragged and TB.Mode == "Hold" then tBtnHold = true end
-			end)
-			i.Changed:Connect(function()
-				if i.UserInputState == Enum.UserInputState.End and pressed then
-					pressed = false
-					tween(tScale, 0.15, { Scale = 1 })
-					if TB.Mode == "Hold" then
-						tBtnHold = false
-					elseif TB.Mode == "Toggle" and not dragged then
-						tLatched = not tLatched
-					end
-				end
-			end)
-		end)
-		table.insert(conns, UIS.InputChanged:Connect(function(i)
-			if not pressed or i ~= moveInput then return end
-			local d = i.Position - startIn
-			if not dragged and d.Magnitude >= 10 then
-				dragged = true
-				tBtnHold = false
-			end
-			if dragged then
-				local vp = viewport()
-				local half = TB.BtnSize / 2
-				local x = math.clamp(startPos.X + d.X, half, math.max(half, vp.X - half))
-				local y = math.clamp(startPos.Y + d.Y, half, math.max(half, vp.Y - half))
-				tbBtn.Position = UDim2.fromOffset(x, y)
-			end
-		end))
-
-		local wasShown, lastKey = false, ""
-		table.insert(conns, RunService.Heartbeat:Connect(function()
-			local show = TB.Enabled and TB.ShowButton
-			if show ~= wasShown then
-				wasShown = show
-				tbBtn.Visible = show
-				if show then
-					tScale.Scale = 0
-					tween(tScale, 0.4, { Scale = 1 }, Enum.EasingStyle.Back)
-				end
-			end
-			if not show then return end
-			local size = TB.BtnSize
-			if tbBtn.Size.X.Offset ~= size then tbBtn.Size = UDim2.fromOffset(size, size) end
-			local active = armed()
-			local txt
-			if TB.Mode == "Always" then txt = "ALWAYS"
-			elseif TB.Mode == "Toggle" then txt = active and "ON" or "OFF"
-			else txt = active and "FIRE" or "HOLD" end
-			local key = tostring(active) .. txt
-			if key ~= lastKey then
-				lastKey = key
-				tSub.Text = txt
-				tween(tFill, 0.2, { BackgroundTransparency = active and 0.35 or 1 })
-				tSub.TextColor3 = active and T.text or T.sub
-			end
-		end))
-
-		local tbB = AimTab:AddSection("Trigger Button")
-		tbB:AddToggle("Show Trigger Button", true, function(on) TB.ShowButton = on end)
-		tbB:AddSlider("Trigger Button Size", 40, 110, TB.BtnSize, function(v) TB.BtnSize = v end, 2)
-		tbB:AddButton("Reset Trigger Button Position", function() resetPos() end)
-		tbB:AddLabel("Tap: toggles in Toggle mode, hold in Hold mode. Drag to move.")
-	end
-end
-
-local a2 = AimTab:AddSection("Hitbox Integration")
+local a2 = AimTab:AddSection("Hitbox Integration", true)
 a2:AddToggle("Hitbox Enabled", false, function(on) Hit.Enabled = on end)
 a2:AddToggle("Head", false, function(on) Hit.Groups.Head = on end)
 a2:AddToggle("Torso (body)", false, function(on) Hit.Groups.Torso = on end)
@@ -5080,7 +4827,7 @@ do
 	sPack:AddDropdown("Background Preset", BGORDER, "Sec", function(o) applyBG(o) end)
 end
 
-local sThemeBg = Settings:AddSection("Theme Backgrounds")
+local sThemeBg = Settings:AddSection("Theme Backgrounds", true)
 sThemeBg:AddColorPicker("Background 0 (Top)", T.bg0, function(c) Aurora:UpdateThemeColor("bg0", c) end)
 sThemeBg:AddColorPicker("Background 1 (Bottom)", T.bg1, function(c) Aurora:UpdateThemeColor("bg1", c) end)
 sThemeBg:AddColorPicker("Sidebar Color", T.side, function(c) Aurora:UpdateThemeColor("side", c) end)
