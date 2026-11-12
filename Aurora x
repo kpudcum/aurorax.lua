@@ -266,6 +266,8 @@ gui.Parent = host
 
 local conns = {}
 gui.Destroying:Connect(function() for _, c in ipairs(conns) do c:Disconnect() end end)
+-- panic icin oyunun orijinal degerleri
+Aurora.Orig = { Gravity = workspace.Gravity, FOV = workspace.CurrentCamera and workspace.CurrentCamera.FieldOfView or 70 }
 
 ------------------------------------------------------------------ BILDIRIMLER
 local notifHolder = new("Frame", { Size = UDim2.new(0, 300, 1, -28), Position = UDim2.new(1, -316, 0, 14), BackgroundTransparency = 1 }, {
@@ -1548,7 +1550,7 @@ local jumpPowerEnabled = false
 local enforcedClockTime = nil
 local enforcedAmbient = nil
 
-RunService.Heartbeat:Connect(function()
+table.insert(conns, RunService.Heartbeat:Connect(function()
 	local char = lp.Character
 	if char then
 		local hum = char:FindFirstChildOfClass("Humanoid")
@@ -1569,7 +1571,7 @@ RunService.Heartbeat:Connect(function()
 	if enforcedAmbient then
 		Lighting.Ambient = enforcedAmbient
 	end
-end)
+end))
 
 
 ------------------------------------------------------------------ CUSTOM SKY
@@ -3559,7 +3561,7 @@ local function applyPart(rec, part, sx, sy, sz)
 end
 
 local hitAcc = 0
-RunService.Heartbeat:Connect(function(dt)
+table.insert(conns, RunService.Heartbeat:Connect(function(dt)
 	hitAcc = hitAcc + dt
 	if hitAcc < 0.1 then return end
 	hitAcc = 0
@@ -3616,7 +3618,7 @@ RunService.Heartbeat:Connect(function(dt)
 			end
 		end
 	end
-end)
+end))
 
 pcall(function() RunService:UnbindFromRenderStep("HitboxUI_Step") end)
 RunService:BindToRenderStep("HitboxUI_Step", Enum.RenderPriority.Last.Value, function()
@@ -3678,12 +3680,13 @@ do
 			customWalkSpeed = MV.Speed
 			walkSpeedEnabled = (MV.Speed ~= 16)
 			MV.SB = false
+			if not MV.WasN and h then Aurora.Orig.WalkSpeed = h.WalkSpeed end
 			MV.WasN = true
 			if h then h.WalkSpeed = MV.Speed end
 		else
 			walkSpeedEnabled = false
 			MV.SB = MV.Speed > 16
-			if MV.WasN and h then h.WalkSpeed = 16 end
+			if MV.WasN and h then h.WalkSpeed = Aurora.Orig.WalkSpeed or 16 end
 			MV.WasN = false
 		end
 	end
@@ -3694,6 +3697,7 @@ do
 			customJumpPower = MV.Jump
 			jumpPowerEnabled = (MV.Jump ~= 50)
 			MV.JB = false
+			if not MV.WasJ and h then Aurora.Orig.JumpPower = h.JumpPower end
 			MV.WasJ = true
 			if h then
 				h.UseJumpPower = true
@@ -3704,7 +3708,7 @@ do
 			MV.JB = MV.Jump > 50
 			if MV.WasJ and h then
 				h.UseJumpPower = true
-				h.JumpPower = 50
+				h.JumpPower = Aurora.Orig.JumpPower or 50
 			end
 			MV.WasJ = false
 		end
@@ -4323,6 +4327,7 @@ do
 			Aurora:Notify("Anti Kick", "Not supported by your executor", 3, "error")
 		end
 	end)
+	gui.Destroying:Connect(function() AK.On = false end)
 	local AF = { On = false, Conn = nil }
 	local function afStop()
 		AF.On = false
@@ -4472,7 +4477,7 @@ do
 end
 
 do
-	local xhS = Visuals:AddSection("Crosshair", true)
+	local xhS = Visuals:AddSection("Crosshair")
 	local XH = { On = false, Style = "Cross + Dot", Color = Color3.fromRGB(255, 255, 255), Rainbow = false, Accent = false, Len = 10, Gap = 4, Th = 2, Op = 1, Outline = true, Spin = false, Conn = nil }
 	local accCol = Color3.fromRGB(139, 108, 255)
 	onAccent(function(a) accCol = a end)
@@ -4580,7 +4585,7 @@ do
 	refresh()
 end
 
-local v3 = Visuals:AddSection("Custom Sky", true)
+local v3 = Visuals:AddSection("Custom Sky")
 v3:AddDropdown("Sky Preset", SkyAPI.Order, "Default", function(o)
 	SkyAPI.Set(o)
 	Aurora:Notify("Custom Sky", T_("Sky: ") .. tostring(o), 2.5)
@@ -5393,6 +5398,94 @@ s1:AddButton("Reset Theme Colors", function()
 	Aurora:ResetTheme()
 	Aurora:Notify("Reset", "All theme colors and backgrounds were restored to defaults.", 3, "success")
 end)
+
+do
+	local pnS = Settings:AddSection("Panic")
+	local PN = { Key = { kind = "key", value = Enum.KeyCode.End }, Busy = false }
+	local skipUntil = 0
+
+	-- panic: tum ozellikleri kapatir, oyunun degerlerini geri yazar, arayuzu ve butun efektleri tamamen siler (sessiz, bildirim yok)
+	local function panic()
+		if PN.Busy then return end
+		PN.Busy = true
+		pcall(function()
+			local hum = lp.Character and lp.Character:FindFirstChildOfClass("Humanoid")
+			if hum then
+				if walkSpeedEnabled then hum.WalkSpeed = Aurora.Orig.WalkSpeed or 16 end
+				if jumpPowerEnabled then hum.JumpPower = Aurora.Orig.JumpPower or 50 end
+			end
+		end)
+		pcall(function()
+			walkSpeedEnabled, jumpPowerEnabled = false, false
+			enforcedClockTime, enforcedAmbient = nil, nil
+			Aim.Enabled = false
+			Hit.Enabled = false
+			Aurora.FlyFlag.On = false
+			if FovLock.Value then
+				FovLock.On = false
+				workspace.CurrentCamera.FieldOfView = Aurora.Orig.FOV
+			end
+			workspace.Gravity = Aurora.Orig.Gravity
+		end)
+		-- gui yok edilince tum Destroying dinleyicileri calisir: fly/noclip/radar/crosshair/yagmur/gokyuzu/ESP/hitbox temizlenir
+		pcall(function() gui:Destroy() end)
+		pcall(function()
+			for _, o in ipairs(host:GetChildren()) do
+				if string.sub(o.Name, 1, 6) == "Aurora" then o:Destroy() end
+			end
+		end)
+		warn("[Aurora] panic: script unloaded")
+	end
+
+	pnS:AddButton("PANIC - Unload Script", panic)
+	if not AIM_MOBILE then
+		pnS:AddKeybind("Panic Key", PN.Key, function(b)
+			PN.Key = b
+			skipUntil = os.clock() + 0.5 -- tusu atarken basilan tus panic'i tetiklemesin
+		end)
+		table.insert(conns, UIS.InputBegan:Connect(function(i)
+			if os.clock() < skipUntil or UIS:GetFocusedTextBox() then return end
+			if matchesKey(i, PN.Key) then panic() end
+		end))
+	end
+
+	-- istege bagli yuzen panic butonu (mobil icin): dokun = panic, surukle = tasi
+	local pb = new("TextButton", {
+		Name = "PanicButton", Text = "", AutoButtonColor = false, AnchorPoint = Vector2.new(0.5, 0.5), Size = UDim2.fromOffset(40, 40),
+		BackgroundColor3 = T.card, BackgroundTransparency = 0.1, BorderSizePixel = 0, Visible = false, ZIndex = 45,
+	}, { corner(20) })
+	local pbs = stroke(T.err, 2, 0.1)
+	pbs.Parent = pb
+	label({ Text = "!", Font = Enum.Font.GothamBlack, TextSize = 22, TextColor3 = T.err, TextXAlignment = Enum.TextXAlignment.Center, Size = UDim2.fromScale(1, 1), ZIndex = 46 }).Parent = pb
+	local vp0 = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(1280, 720)
+	pb.Position = UDim2.fromOffset(vp0.X - 40, vp0.Y * 0.3)
+	pb.Parent = gui
+	do
+		local pressed, dragged, startIn, startPos, mv = false, false, nil, Vector2.new(0, 0), nil
+		pb.InputBegan:Connect(function(i)
+			if i.UserInputType ~= Enum.UserInputType.MouseButton1 and i.UserInputType ~= Enum.UserInputType.Touch then return end
+			pressed, dragged, startIn, mv = true, false, i.Position, i
+			startPos = Vector2.new(pb.Position.X.Offset, pb.Position.Y.Offset)
+			i.Changed:Connect(function()
+				if i.UserInputState == Enum.UserInputState.End and pressed then
+					pressed = false
+					if not dragged then panic() end
+				end
+			end)
+		end)
+		table.insert(conns, UIS.InputChanged:Connect(function(i)
+			if not pressed or i ~= mv then return end
+			local d = i.Position - startIn
+			if not dragged and d.Magnitude >= 10 then dragged = true end
+			if dragged then
+				local v = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(1280, 720)
+				pb.Position = UDim2.fromOffset(math.clamp(startPos.X + d.X, 20, v.X - 20), math.clamp(startPos.Y + d.Y, 20, v.Y - 20))
+			end
+		end))
+	end
+	pnS:AddToggle("Floating Panic Button", false, function(on) pb.Visible = on end)
+	pnS:AddLabel("Panic removes the UI, turns every feature off and restores the game's values. Run the script again to bring it back.")
+end
 
 local sPack = Settings:AddSection("Theme Packs & Backgrounds")
 do
