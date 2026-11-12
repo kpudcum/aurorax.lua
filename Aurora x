@@ -3821,6 +3821,26 @@ do
 			end
 		end)
 	end)
+	local AK = { On = false, Hooked = false }
+	sv2:AddToggle("Anti Kick (client)", false, function(on)
+		AK.On = on
+		if not on or AK.Hooked then return end
+		local ok = pcall(function()
+			local old
+			local function hk(self, ...)
+				if AK.On and self == lp and string.lower(getnamecallmethod()) == "kick" then return nil end
+				return old(self, ...)
+			end
+			old = hookmetamethod(game, "__namecall", (newcclosure and newcclosure(hk)) or hk)
+		end)
+		if ok then
+			AK.Hooked = true
+			Aurora:Notify("Anti Kick", "Active: client-side Kick calls are blocked", 2.5, "success")
+		else
+			AK.On = false
+			Aurora:Notify("Anti Kick", "Not supported by your executor", 3, "error")
+		end
+	end)
 	local AF = { On = false, Conn = nil }
 	local function afStop()
 		AF.On = false
@@ -4102,7 +4122,7 @@ end)
 -- 3b. TELEPORT SEKME
 do
 	local HttpService = game:GetService("HttpService")
-	local TP = { Mode = "Instant", Time = 1.2, Lift = 3, Selected = nil, Back = nil, Filter = "", Click = false, SaveName = "", Coords = "" }
+	local TP = { Mode = "Instant", Time = 1.2, Lift = 3, Selected = nil, Back = nil, Filter = "", Click = false, Lock = true, LockTime = 1.2, Speed = 140, Noclip = true, Snap = true, Job = 0, HoldConn = nil, SaveName = "", Coords = "" }
 	local SAVE_FILE = "AuroraX_Teleports.json"
 	local placeKey = tostring(game.PlaceId)
 	local saved = {}
@@ -4132,25 +4152,112 @@ do
 	local function say(msg, kind) Aurora:Notify("Teleport", msg, 2.5, kind or "success") end
 
 	local tweenObj = nil
+	local function stopHold()
+		if TP.HoldConn then TP.HoldConn:Disconnect() TP.HoldConn = nil end
+	end
+	gui.Destroying:Connect(stopHold)
+	local function zeroVel(r)
+		pcall(function()
+			r.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+			r.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
+		end)
+	end
+	-- zemine gomulmeyi onler: hedefin altinda zemin varsa ayaklar zeminin ustune alinir
+	local function groundFix(cf, hum, r)
+		if not TP.Snap then return cf end
+		local params = RaycastParams.new()
+		params.FilterType = Enum.RaycastFilterType.Exclude
+		params.FilterDescendantsInstances = { lp.Character }
+		local res = workspace:Raycast(cf.Position + Vector3.new(0, 4, 0), Vector3.new(0, -80, 0), params)
+		if res then
+			local minY = res.Position.Y + (hum and hum.HipHeight or 2) + r.Size.Y / 2 + 0.3
+			if cf.Position.Y < minY then return cf + Vector3.new(0, minY - cf.Position.Y, 0) end
+		end
+		return cf
+	end
+	-- anti rubberband: oyun seni geri cekerse hedef konum kisa sure boyunca tekrar yazilir
+	local function hold(target, job)
+		stopHold()
+		if not TP.Lock or TP.LockTime <= 0 then return end
+		local t0 = os.clock()
+		TP.HoldConn = RunService.Heartbeat:Connect(function()
+			local r = rootOf(lp)
+			if job ~= TP.Job or not r or os.clock() - t0 > TP.LockTime or Aurora.FlyFlag.On then stopHold() return end
+			local hum = lp.Character and lp.Character:FindFirstChildOfClass("Humanoid")
+			-- oyuncu yurumeye basladiysa birak, yoksa hareketle savasir
+			if os.clock() - t0 > 0.3 and hum and hum.MoveDirection.Magnitude > 0.1 then stopHold() return end
+			if (r.Position - target.Position).Magnitude > 3 then r.CFrame = target end
+			zeroVel(r)
+		end)
+	end
 	local function goCF(cf, noLift)
 		local r = rootOf(lp)
 		if not r then say("Character not found", "error") return false end
 		TP.Back = r.CFrame
+		TP.Job = TP.Job + 1
+		local job = TP.Job
+		stopHold()
 		if tweenObj then tweenObj:Cancel() tweenObj = nil end
+		local hum = lp.Character and lp.Character:FindFirstChildOfClass("Humanoid")
 		local target = noLift and cf or (cf + Vector3.new(0, TP.Lift, 0))
+		target = groundFix(target, hum, r)
 		if TP.Mode == "Smooth" then
 			tweenObj = TweenService:Create(r, TweenInfo.new(TP.Time, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut), { CFrame = target })
+			tweenObj.Completed:Connect(function()
+				if job == TP.Job then hold(target, job) end
+			end)
 			tweenObj:Play()
+		elseif TP.Mode == "Stepped (Bypass)" then
+			-- ani isinlanma yerine sabit hizla kucuk adimlarla ilerler (hiz kontrolu yapan anti-cheat'leri atlatir); yolda duvarlar engellemesin diye noclip
+			local saved = {}
+			if TP.Noclip and lp.Character then
+				for _, p in ipairs(lp.Character:GetDescendants()) do
+					if p:IsA("BasePart") and p.CanCollide then
+						table.insert(saved, p)
+						p.CanCollide = false
+					end
+				end
+			end
+			local function restore()
+				for _, p in ipairs(saved) do
+					if p.Parent then p.CanCollide = true end
+				end
+			end
+			local conn
+			conn = RunService.Stepped:Connect(function(_, dt)
+				local rr = rootOf(lp)
+				if job ~= TP.Job or not rr then
+					conn:Disconnect()
+					restore()
+					return
+				end
+				local diff = target.Position - rr.Position
+				local step = TP.Speed * dt
+				if diff.Magnitude <= step then
+					conn:Disconnect()
+					restore()
+					rr.CFrame = target
+					zeroVel(rr)
+					hold(target, job)
+					return
+				end
+				for _, p in ipairs(saved) do
+					if p.Parent and p.CanCollide then p.CanCollide = false end
+				end
+				rr.CFrame = CFrame.new(rr.Position + diff.Unit * step) * (rr.CFrame - rr.CFrame.Position)
+				zeroVel(rr)
+			end)
 		else
-			pcall(function() r.AssemblyLinearVelocity = Vector3.new(0, 0, 0) end)
+			zeroVel(r)
 			r.CFrame = target
+			hold(target, job)
 		end
 		return true
 	end
 	local function goPlayer(p)
 		local r = rootOf(p)
 		if not p or not r then say("Player not found or has no character", "error") return end
-		if goCF(r.CFrame * CFrame.new(0, 0, 3)) then say(p.DisplayName .. " yanina isinlandin") end
+		if goCF(r.CFrame * CFrame.new(0, 0, 3)) then say("Teleported to " .. p.DisplayName) end
 	end
 
 	local spectating = false
@@ -4352,7 +4459,7 @@ do
 			local del = new("TextButton", { Text = "X", Size = UDim2.fromOffset(34, 28), Position = UDim2.new(1, -46, 0.5, -14), BackgroundColor3 = T.err, BackgroundTransparency = 0.25, Font = Enum.Font.GothamBlack, TextSize = 12, TextColor3 = Color3.new(1, 1, 1), AutoButtonColor = false, BorderSizePixel = 0, ZIndex = 3 }, { corner(8) })
 			del.Parent = f
 			go.MouseButton1Click:Connect(function()
-				if goCF(CFrame.new(s.x, s.y, s.z)) then say(tostring(s.name) .. " konumuna isinlandin") end
+				if goCF(CFrame.new(s.x, s.y, s.z)) then say("Teleported to " .. tostring(s.name)) end
 			end)
 			del.MouseButton1Click:Connect(function()
 				for i, v in ipairs(saved) do
@@ -4402,11 +4509,19 @@ do
 
 	------------------------------------------------ AYARLAR
 	local tp4 = Tele:AddSection("Teleport Settings")
-	tp4:AddDropdown("Mode", { "Instant", "Smooth" }, "Instant", function(o) TP.Mode = o end)
+	tp4:AddDropdown("Mode", { "Instant", "Smooth", "Stepped (Bypass)" }, "Instant", function(o) TP.Mode = o end)
 	tp4:AddSlider("Smooth Duration (s)", 0.2, 6, 1.2, function(v) TP.Time = v end, 0.1)
 	tp4:AddSlider("Height Offset (studs)", 0, 20, 3, function(v) TP.Lift = v end, 0.5)
 	tp4:AddToggle("Click / Tap Teleport", false, function(on) TP.Click = on end)
 	tp4:AddLabel("PC: hold Ctrl + click. Mobile: tap the screen.")
+
+	local tpB = Tele:AddSection("Teleport Bypass")
+	tpB:AddToggle("Anti Rubberband (hold position)", true, function(on) TP.Lock = on end)
+	tpB:AddSlider("Hold Time (s)", 0.2, 5, 1.2, function(v) TP.LockTime = v end, 0.1)
+	tpB:AddSlider("Step Speed (studs/s)", 40, 400, 140, function(v) TP.Speed = v end, 5)
+	tpB:AddToggle("Noclip While Stepping", true, function(on) TP.Noclip = on end)
+	tpB:AddToggle("Ground Snap (anti stuck)", true, function(on) TP.Snap = on end)
+	tpB:AddLabel("If a game pulls you back, use Mode: Stepped (Bypass). Lower step speed is safer.")
 	local function rayHit(ray)
 		local ignore = {}
 		if lp.Character then table.insert(ignore, lp.Character) end
