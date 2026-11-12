@@ -2238,20 +2238,49 @@ function INV.row(g, n, tag, txt, c, ts, ih, tagW, dim)
 	if not nm.Visible then nm.Visible = true end
 end
 
+INV.KEYS = { 'inv', 'item', 'hotbar', 'tool', 'loadout', 'weapon', 'backpack' }
+function INV.folderLike(n)
+	n = string.lower(n)
+	for _, k in ipairs(INV.KEYS) do
+		if string.find(n, k, 1, true) then return true end
+	end
+	return false
+end
+
 function INV.scan(model, player)
 	local held, count, order = nil, {}, {}
+	local function add(name)
+		if not count[name] then count[name] = 0; order[#order + 1] = name end
+		count[name] = count[name] + 1
+	end
 	local function sc(c, isChar)
 		if not c then return end
 		for _, t in ipairs(c:GetChildren()) do
 			if t:IsA('Tool') then
 				if isChar and not held then held = t.Name end
-				if not count[t.Name] then count[t.Name] = 0; order[#order + 1] = t.Name end
-				count[t.Name] = count[t.Name] + 1
+				add(t.Name)
+			end
+		end
+	end
+	-- Backpack baskalarina replike olmaz: oyunlarin kendi envanter klasorlerini (Inventory/Items/Hotbar...) da tara
+	local function sc2(c)
+		if not c then return end
+		for _, f in ipairs(c:GetChildren()) do
+			if (f:IsA('Folder') or f:IsA('Configuration')) and INV.folderLike(f.Name) then
+				for _, g in ipairs(f:GetChildren()) do
+					local nm = g.Name
+					if g:IsA('StringValue') and g.Value ~= '' then nm = g.Value end
+					if g:IsA('Tool') or g:IsA('ValueBase') or g:IsA('Folder') or g:IsA('Model') then add(nm) end
+				end
 			end
 		end
 	end
 	sc(model, true)
-	if player then sc(player:FindFirstChildOfClass('Backpack'), false) end
+	if player then
+		sc(player:FindFirstChildOfClass('Backpack'), false)
+		sc2(player)
+	end
+	sc2(model)
 	local names = {}
 	for i = 1, math.min(24, #order) do
 		local n = order[i]
@@ -2264,7 +2293,7 @@ function INV.draw(d, g, x, y, ts, far, c)
 	ts = math.max(7, math.floor(ts * ESP.InvScale / 100 + .5))
 	local ih = ts + 3
 	local tagW = math.floor(ts * 3.6)
-	local tr = Lang == 'tr'
+	local tr = false
 	local n = 0
 	if ESP.HeldItem then
 		n = n + 1
@@ -2294,7 +2323,7 @@ function INV.draw(d, g, x, y, ts, far, c)
 		if nm.Visible then nm.Visible = false end
 	end
 	if n == 0 then show(g, false) return 0 end
-	local cw = math.clamp(math.floor(ts * 13), 104, 230)
+	local cw = math.clamp(math.floor(ts * 12 + 10), 70, 260)
 	g.card.Size = UDim2.fromOffset(cw, n * ih + 6)
 	g.card.Position = UDim2.fromOffset(x - math.floor(cw * .5), y)
 	g.st.Color = c; g.bar.BackgroundColor3 = c
@@ -2520,8 +2549,9 @@ local function drawESP(d, cam, camCF)
 	x1, y1, x2, y2 = math.floor(x1 + .5), math.floor(y1 + .5), math.floor(x2 + .5), math.floor(y2 + .5)
 	mx = math.floor(mx + .5); w = x2 - x1; h = y2 - y1
 	local far = h < 30 or d.dist > 300
-	local ts = ESP.TextSize
-	if far then ts = math.max(8, ts - 2) end
+	-- yazi/kart boyutu hedefin ekrandaki boyuyla orantili: uzaklastikca kuculur, yaklastikca buyur
+	local sc = math.clamp(h / 120, 0.6, 1.1)
+	local ts = math.max(8, math.floor(ESP.TextSize * sc + .5))
 
 	if ESP.Box then
 		local g = grp(d, 'box', buildBox)
@@ -2580,9 +2610,9 @@ local function drawESP(d, cam, camCF)
 		show(d.g.dist, false)
 	end
 
-	if (ESP.HeldItem or ESP.Inventory) and h >= 20 then
+	if (ESP.HeldItem or ESP.Inventory) and h >= 12 then
 		local g = grp(d, 'inv', INV.build)
-		INV.draw(d, g, mx, by + 2, ts, far, c)
+		INV.draw(d, g, mx, by + 2, ts, h < 18, c)
 	else
 		show(d.g.inv, false)
 	end
@@ -4369,8 +4399,21 @@ do
 	onAccent(function(a) me.BackgroundColor3 = a end)
 	me.Parent = root
 
-	local rangeLbl = label({ Text = "250m", TextSize = 10, Font = Enum.Font.GothamBold, TextColor3 = T.sub, TextXAlignment = Enum.TextXAlignment.Center, Size = UDim2.new(0, 60, 0, 12), AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -8), ZIndex = 46 })
+	local rangeLbl = label({ Text = "250 st", TextSize = 10, Font = Enum.Font.GothamBold, TextColor3 = T.sub, TextXAlignment = Enum.TextXAlignment.Center, Size = UDim2.new(0, 60, 0, 12), AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -8), ZIndex = 46 })
 	rangeLbl.Parent = root
+
+	-- gorus konisi (kameranin baktigi alan), en yakin dusman bilgisi ve kuzey isareti
+	local cones = {}
+	for i = 1, 2 do
+		local cf = new("Frame", { Size = UDim2.fromOffset(1, 60), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), BackgroundColor3 = Color3.fromRGB(255, 255, 255), BackgroundTransparency = 0.55, BorderSizePixel = 0, ZIndex = 43 })
+		onAccent(function(a) cf.BackgroundColor3 = a end)
+		cf.Parent = root
+		cones[i] = cf
+	end
+	local nearLbl = label({ Text = "", TextSize = 10, Font = Enum.Font.GothamBold, TextColor3 = T.sub, TextXAlignment = Enum.TextXAlignment.Center, Size = UDim2.new(0, 110, 0, 12), AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 22), ZIndex = 46 })
+	nearLbl.Parent = root
+	local northLbl = label({ Text = "N", TextSize = 10, Font = Enum.Font.GothamBlack, TextColor3 = Color3.fromRGB(255, 110, 120), TextXAlignment = Enum.TextXAlignment.Center, Size = UDim2.fromOffset(14, 12), AnchorPoint = Vector2.new(0.5, 0.5), ZIndex = 46 })
+	northLbl.Parent = root
 
 	-- surukle (mobil + PC); "Lock Position" acikken tasinmaz
 	do
@@ -4400,13 +4443,14 @@ do
 		local d = dots[key]
 		if d then return d end
 		local f = new("Frame", { Size = UDim2.fromOffset(7, 7), AnchorPoint = Vector2.new(0.5, 0.5), BorderSizePixel = 0, ZIndex = 44 })
-		corner(999).Parent = f
+		local cr = corner(999)
+		cr.Parent = f
 		stroke(Color3.fromRGB(0, 0, 0), 1, 0.4).Parent = f
 		local t = label({ Text = "", TextSize = 9, Font = Enum.Font.GothamBold, TextColor3 = T.text, TextXAlignment = Enum.TextXAlignment.Center, Size = UDim2.new(0, 70, 0, 10), AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 1, 1), ZIndex = 44 })
 		t.TextStrokeTransparency = 0.5
 		t.Parent = f
 		f.Parent = root
-		d = { f = f, t = t, stamp = 0 }
+		d = { f = f, t = t, c = cr, shape = 0, stamp = 0 }
 		dots[key] = d
 		return d
 	end
@@ -4428,9 +4472,20 @@ do
 		d.f.Position = UDim2.new(0.5, nx * sc * rad, 0.5, -ny * sc * rad)
 		d.f.BackgroundColor3 = col
 		d.f.BackgroundTransparency = dist > R.Range and 0.55 or 0
+		-- sekil yukseklik farkini gosterir: elmas = yukarida, kare = asagida, daire = ayni seviye; yakindakiler buyuk
+		local dy = rootPart.Position.Y - mine.Y
+		local shape = dy > 10 and 1 or (dy < -10 and 2 or 3)
+		if d.shape ~= shape then
+			d.shape = shape
+			d.c.CornerRadius = shape == 3 and UDim.new(0, 999) or (shape == 2 and UDim.new(0, 2) or UDim.new(0, 0))
+			d.f.Rotation = shape == 1 and 45 or 0
+		end
+		local ds = dist < 40 and 10 or 7
+		d.f.Size = UDim2.fromOffset(ds, ds)
 		d.f.Visible = true
 		d.t.Visible = R.Names
 		if R.Names then d.t.Text = name or "" end
+		return dist
 	end
 
 	local function update(dt)
@@ -4453,6 +4508,22 @@ do
 			end
 		end
 		local mine = myRoot.Position
+		local lv0 = cam.CFrame.LookVector
+		local yaw = math.atan2(lv0.X, -lv0.Z)
+		local vpz = cam.ViewportSize
+		local hf = 2 * math.atan(math.tan(math.rad(cam.FieldOfView) / 2) * (vpz.X / math.max(1, vpz.Y)))
+		local half = R.Size / 2
+		local cl = half - 8
+		local base = R.Rot and 0 or yaw
+		for i = 1, 2 do
+			local th = base + (i == 1 and -hf / 2 or hf / 2)
+			cones[i].Size = UDim2.fromOffset(1, cl)
+			cones[i].Position = UDim2.new(0.5, math.sin(th) * cl / 2, 0.5, -math.cos(th) * cl / 2)
+			cones[i].Rotation = math.deg(th)
+		end
+		local nth = R.Rot and -yaw or 0
+		northLbl.Position = UDim2.new(0.5, math.sin(nth) * (half - 9), 0.5, -math.cos(nth) * (half - 9))
+		local near, nearName = math.huge, ""
 		for _, pl in ipairs(Players:GetPlayers()) do
 			if pl ~= lp then
 				local c = pl.Character
@@ -4462,7 +4533,8 @@ do
 					local mate = lp.Team ~= nil and pl.Team == lp.Team
 					if R.Team or not mate then
 						local col = mate and Color3.fromRGB(80, 225, 140) or (ESP.Rainbow and rainbow or Color3.fromRGB(255, 80, 95))
-						place(pl, rt, fwd, right, mine, col, pl.DisplayName)
+						local dd = place(pl, rt, fwd, right, mine, col, pl.DisplayName)
+						if dd and not mate and dd < near then near, nearName = dd, pl.DisplayName end
 					end
 				end
 			end
@@ -4479,6 +4551,7 @@ do
 		for k, d in pairs(dots) do
 			if d.stamp ~= frameId then d.f:Destroy() dots[k] = nil end
 		end
+		nearLbl.Text = near < math.huge and (nearName .. " " .. math.floor(near) .. " st") or ""
 	end
 
 	local function setOn(on)
@@ -4502,7 +4575,7 @@ do
 	eRad:AddToggle("Radar", false, function(on) setOn(on) end)
 	eRad:AddSlider("Radar Range", 50, 1000, 250, function(v)
 		R.Range = v
-		rangeLbl.Text = tostring(math.floor(v)) .. "m"
+		rangeLbl.Text = tostring(math.floor(v)) .. " st"
 	end)
 	eRad:AddSlider("Radar Size", 100, 260, 150, function(v)
 		R.Size = math.floor(v)
