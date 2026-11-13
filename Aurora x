@@ -645,13 +645,13 @@ function Aurora:CreateWindow(titleText, subtitle)
 		if not gp and i.KeyCode == Enum.KeyCode.RightShift then setOpen(not isOpen) end
 	end))
 	closeB.MouseButton1Click:Connect(function()
-		if Aurora.FCActive or os.clock() < (Aurora.NoClose or 0) then return end
+		if os.clock() < (Aurora.NoClose or 0) then return end
 		warn("[Aurora] X butonuna basildi, pencere kapatiliyor")
 		setOpen(false)
 		task.delay(0.3, function() gui:Destroy() end)
 	end)
 	minB.MouseButton1Click:Connect(function()
-		if Aurora.FCActive or os.clock() < (Aurora.NoClose or 0) then return end
+		if os.clock() < (Aurora.NoClose or 0) then return end
 		setOpen(false)
 		task.delay(0.27, function()
 			if not isOpen then
@@ -4381,7 +4381,7 @@ do
 	local fcS = Visuals:AddSection("Freecam")
 	local FC = { On = false, Speed = 50, Fast = 3, Smooth = 35, Sens = 0.3, Key = { kind = "key", value = Enum.KeyCode.P },
 		yaw = 0, pitch = 0, cyaw = 0, cpitch = 0, pos = Vector3.new(0, 0, 0), vel = Vector3.new(0, 0, 0), saved = nil,
-		mv = Vector2.new(0, 0), up = 0, look = Vector2.new(0, 0), ui = nil, rmb = false, cn = {}, FOV = nil, stream = 0, wheel = nil }
+		mv = Vector2.new(0, 0), up = 0, look = Vector2.new(0, 0), ui = nil, rmb = false, cn = {} }
 	local CAS = game:GetService("ContextActionService")
 	local fcToggle = nil
 	local stopFC
@@ -4400,11 +4400,12 @@ do
 	-- mobil: sol joystick (hareket), sag tarafa surukle (bakis), yukari/asagi butonlari ve cikis
 	local function buildUI()
 		local cam0 = workspace.CurrentCamera
+		local vp = cam0 and cam0.ViewportSize or Vector2.new(800, 400)
 		local touch = UIS.TouchEnabled
 		local sg = Instance.new("ScreenGui")
 		sg.Name = "AuroraFreecamUI"
 		sg.ResetOnSpawn = false
-		sg.IgnoreGuiInset = false
+		sg.IgnoreGuiInset = true
 		sg.DisplayOrder = 250
 		sg.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 		sg.Parent = host
@@ -4434,9 +4435,8 @@ do
 		end
 		local bg = Color3.fromRGB(18, 18, 28)
 		local hintText = touch and "FREECAM  |  Left pad: move  |  Drag screen: look  |  Up / Down buttons"
-			or ("FREECAM  |  WASD move  |  Space/Ctrl up-down  |  Shift fast  |  Hold RMB: look  |  Scroll: speed  |  " .. tostring(FC.Key.value and FC.Key.value.Name or "key") .. " to exit")
-		local hint = mk("TextLabel", { Text = hintText, Font = Enum.Font.GothamBold, TextSize = 12, TextColor3 = Color3.new(1, 1, 1), BackgroundColor3 = bg, BackgroundTransparency = 0.15, AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 6), Size = UDim2.new(1, -20, 0, 40), ZIndex = 20, BorderSizePixel = 0, TextWrapped = true }, sg)
-		mk("UISizeConstraint", { MaxSize = Vector2.new(620, 40) }, hint)
+			or ("FREECAM  |  WASD move  |  Space / Ctrl up-down  |  Shift fast  |  hold Right Mouse to look  |  " .. tostring(FC.Key.value and FC.Key.value.Name or "key") .. " to exit")
+		local hint = mk("TextLabel", { Text = hintText, Font = Enum.Font.GothamBold, TextSize = 12, TextColor3 = Color3.new(1, 1, 1), BackgroundColor3 = bg, BackgroundTransparency = 0.15, AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 10), Size = UDim2.fromOffset(math.min(vp.X - 20, 620), 28), ZIndex = 20, BorderSizePixel = 0 }, sg)
 		rnd(hint, 14)
 		local hst = strk(hint, accent, 1.5, 0.2)
 		table.insert(conns2, { Disconnect = function() end })
@@ -4447,7 +4447,7 @@ do
 			end
 		end)
 		-- cikis butonu (hem mobil hem PC)
-		local ex = mk("TextButton", { Text = "", AutoButtonColor = false, AnchorPoint = Vector2.new(0.5, 0), Size = UDim2.fromOffset(140, 32), Position = UDim2.new(0.5, 0, 0, 52), BackgroundColor3 = bg, BackgroundTransparency = 0.1, BorderSizePixel = 0, ZIndex = 30 }, sg)
+		local ex = mk("TextButton", { Text = "", AutoButtonColor = false, AnchorPoint = Vector2.new(0.5, 0), Size = UDim2.fromOffset(140, 32), Position = UDim2.new(0.5, 0, 0, 46), BackgroundColor3 = bg, BackgroundTransparency = 0.1, BorderSizePixel = 0, ZIndex = 30 }, sg)
 		rnd(ex, 16)
 		strk(ex, Color3.fromRGB(255, 107, 122), 1.5, 0.1)
 		txt(ex, "EXIT FREECAM", 12, 31)
@@ -4455,7 +4455,6 @@ do
 		local function doExit()
 			if exDone then return end
 			exDone = true
-			Aurora.NoClose = os.clock() + 1.5
 			pcall(function() sg:Destroy() end)
 			local ok, e = pcall(function() Aurora.FCExit() end)
 			if not ok then warn("[Aurora] freecam exit: " .. tostring(e)) end
@@ -4463,14 +4462,14 @@ do
 		table.insert(conns2, ex.Activated:Connect(doExit))
 		table.insert(conns2, ex.MouseButton1Click:Connect(doExit))
 		if touch then
-			local base = mk("Frame", { Size = UDim2.fromOffset(140, 140), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0, 105, 1, -115), BackgroundColor3 = bg, BackgroundTransparency = 0.3, BorderSizePixel = 0, ZIndex = 10 }, sg)
+			local base = mk("Frame", { Size = UDim2.fromOffset(140, 140), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromOffset(105, vp.Y - 115), BackgroundColor3 = bg, BackgroundTransparency = 0.3, BorderSizePixel = 0, ZIndex = 10 }, sg)
 			rnd(base, 70)
 			strk(base, accent, 2, 0.2)
 			local knob = mk("Frame", { Size = UDim2.fromOffset(60, 60), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), BackgroundColor3 = accent, BackgroundTransparency = 0.1, BorderSizePixel = 0, ZIndex = 11 }, base)
 			rnd(knob, 30)
 			onAccent(function(a) pcall(function() knob.BackgroundColor3 = a end) end)
 			local function mkBtn(sym, y)
-				local b = mk("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Size = UDim2.fromOffset(64, 64), Position = UDim2.new(1, -55, 1, -y), BackgroundColor3 = bg, BackgroundTransparency = 0.2, BorderSizePixel = 0, ZIndex = 10 }, sg)
+				local b = mk("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Size = UDim2.fromOffset(64, 64), Position = UDim2.fromOffset(vp.X - 55, vp.Y - y), BackgroundColor3 = bg, BackgroundTransparency = 0.2, BorderSizePixel = 0, ZIndex = 10 }, sg)
 				rnd(b, 32)
 				strk(b, accent, 2, 0.15)
 				txt(b, sym, 24, 11)
@@ -4577,32 +4576,19 @@ do
 		FC.vel = FC.vel:Lerp(target, 1 - math.exp(-dt * k * 0.6))
 		FC.pos = FC.pos + FC.vel * dt
 		cam.CFrame = CFrame.new(FC.pos) * rot
-		cam.Focus = cam.CFrame
-		if FC.FOV and cam.FieldOfView ~= FC.FOV then cam.FieldOfView = FC.FOV end
-		FC.stream = FC.stream - dt
-		if FC.stream <= 0 and workspace.StreamingEnabled then
-			FC.stream = 1.5
-			task.spawn(function() pcall(function() lp:RequestStreamAroundAsync(FC.pos) end) end)
-		end
 	end
 
 	local function startFC()
 		local cam = workspace.CurrentCamera
 		if not cam or FC.On then return end
-		FC.saved = { type = cam.CameraType, subject = cam.CameraSubject, cf = cam.CFrame, fov = cam.FieldOfView }
+		FC.saved = { type = cam.CameraType, subject = cam.CameraSubject, cf = cam.CFrame }
 		local rx, ry = cam.CFrame:ToOrientation()
 		FC.pitch, FC.yaw, FC.cpitch, FC.cyaw = rx, ry, rx, ry
 		FC.pos = cam.CFrame.Position
 		FC.vel = Vector3.new(0, 0, 0)
 		FC.mv, FC.up, FC.look, FC.rmb = Vector2.new(0, 0), 0, Vector2.new(0, 0), false
 		FC.On = true
-		Aurora.FCActive = true
-		FC.stream = 0
 		cam.CameraType = Enum.CameraType.Scriptable
-		FC.wheel = UIS.InputChanged:Connect(function(i, gp)
-			if gp or i.UserInputType ~= Enum.UserInputType.MouseWheel then return end
-			FC.Speed = math.clamp(FC.Speed * (1 + 0.12 * i.Position.Z), 5, 300)
-		end)
 		-- menu acik kalirsa kontrolleri ortbasar: freecam acilirken menu gizlenir, kapaninca geri acilir
 		FC.wasOpen = Window.IsOpen and Window.IsOpen() or false
 		if FC.wasOpen and Window.SetOpen then Window.SetOpen(false) end
@@ -4625,10 +4611,8 @@ do
 	stopFC = function()
 		if not FC.On then return end
 		FC.On = false
-		Aurora.FCActive = false
 		pcall(function() RunService:UnbindFromRenderStep("AuroraFreecam") end)
 		pcall(function() CAS:UnbindAction("AuroraFreecamSink") end)
-		pcall(function() if FC.wheel then FC.wheel:Disconnect() FC.wheel = nil end end)
 		pcall(function()
 			local c = FC.ctl or controls()
 			FC.ctl = nil
@@ -4646,28 +4630,16 @@ do
 		FC.wasOpen = false
 		if reopen then
 			-- menu aninda geri gelir; parmak hala ekrandayken X/minimize yanlislikla tetiklenmesin diye kisa koruma
-			Aurora.NoClose = os.clock() + 1.5
-			task.delay(0.3, function()
-				if FC.On or FC.dying then return end
-				Aurora.NoClose = math.max(Aurora.NoClose or 0, os.clock() + 1.2)
-				pcall(function() Window.SetOpen(true) end)
-			end)
+			Aurora.NoClose = os.clock() + 0.9
+			pcall(function() Window.SetOpen(true) end)
 		end
 		pcall(function()
 			local cam = workspace.CurrentCamera
-			local sv = FC.saved
-			if cam and sv then
-				if sv.fov then cam.FieldOfView = sv.fov end
-				if sv.type == Enum.CameraType.Scriptable then
-					cam.CameraType = Enum.CameraType.Scriptable
-					cam.CFrame = sv.cf
-				else
-					local hum = lp.Character and lp.Character:FindFirstChildOfClass("Humanoid")
-					cam.CameraType = Enum.CameraType.Custom
-					cam.CameraSubject = hum or sv.subject
-				end
+			if cam and FC.saved then
+				local hum = lp.Character and lp.Character:FindFirstChildOfClass("Humanoid")
+				cam.CameraType = Enum.CameraType.Custom
+				cam.CameraSubject = hum or FC.saved.subject
 			end
-			FC.saved = nil
 		end)
 	end
 	-- cikis: once dogrudan kapat, sonra toggle gorunumunu senkronla
@@ -4719,7 +4691,6 @@ do
 	fcS:AddSlider("Fast Multiplier (Shift)", 1, 8, 3, function(v) FC.Fast = v end, 0.5)
 	fcS:AddSlider("Smoothness", 0, 100, 35, function(v) FC.Smooth = v end)
 	fcS:AddSlider("Look Sensitivity", 0.1, 1.5, 0.3, function(v) FC.Sens = v end, 0.05)
-	fcS:AddSlider("Field of View", 30, 120, 70, function(v) FC.FOV = v end)
 end
 
 do
@@ -5615,94 +5586,6 @@ s1:AddButton("Reset Theme Colors", function()
 	Aurora:ResetTheme()
 	Aurora:Notify("Reset", "All theme colors and backgrounds were restored to defaults.", 3, "success")
 end)
-
-do
-	local pnS = Settings:AddSection("Panic")
-	local PN = { Key = { kind = "key", value = Enum.KeyCode.End }, Busy = false }
-	local skipUntil = 0
-
-	-- panic: tum ozellikleri kapatir, oyunun degerlerini geri yazar, arayuzu ve butun efektleri tamamen siler (sessiz, bildirim yok)
-	local function panic()
-		if PN.Busy then return end
-		PN.Busy = true
-		pcall(function()
-			local hum = lp.Character and lp.Character:FindFirstChildOfClass("Humanoid")
-			if hum then
-				if walkSpeedEnabled then hum.WalkSpeed = Aurora.Orig.WalkSpeed or 16 end
-				if jumpPowerEnabled then hum.JumpPower = Aurora.Orig.JumpPower or 50 end
-			end
-		end)
-		pcall(function()
-			walkSpeedEnabled, jumpPowerEnabled = false, false
-			enforcedClockTime, enforcedAmbient = nil, nil
-			Aim.Enabled = false
-			Hit.Enabled = false
-			Aurora.FlyFlag.On = false
-			if FovLock.Value then
-				FovLock.On = false
-				workspace.CurrentCamera.FieldOfView = Aurora.Orig.FOV
-			end
-			workspace.Gravity = Aurora.Orig.Gravity
-		end)
-		-- gui yok edilince tum Destroying dinleyicileri calisir: fly/noclip/radar/crosshair/yagmur/gokyuzu/ESP/hitbox temizlenir
-		pcall(function() gui:Destroy() end)
-		pcall(function()
-			for _, o in ipairs(host:GetChildren()) do
-				if string.sub(o.Name, 1, 6) == "Aurora" then o:Destroy() end
-			end
-		end)
-		warn("[Aurora] panic: script unloaded")
-	end
-
-	pnS:AddButton("PANIC - Unload Script", panic)
-	if not AIM_MOBILE then
-		pnS:AddKeybind("Panic Key", PN.Key, function(b)
-			PN.Key = b
-			skipUntil = os.clock() + 0.5 -- tusu atarken basilan tus panic'i tetiklemesin
-		end)
-		table.insert(conns, UIS.InputBegan:Connect(function(i)
-			if os.clock() < skipUntil or UIS:GetFocusedTextBox() then return end
-			if matchesKey(i, PN.Key) then panic() end
-		end))
-	end
-
-	-- istege bagli yuzen panic butonu (mobil icin): dokun = panic, surukle = tasi
-	local pb = new("TextButton", {
-		Name = "PanicButton", Text = "", AutoButtonColor = false, AnchorPoint = Vector2.new(0.5, 0.5), Size = UDim2.fromOffset(40, 40),
-		BackgroundColor3 = T.card, BackgroundTransparency = 0.1, BorderSizePixel = 0, Visible = false, ZIndex = 45,
-	}, { corner(20) })
-	local pbs = stroke(T.err, 2, 0.1)
-	pbs.Parent = pb
-	label({ Text = "!", Font = Enum.Font.GothamBlack, TextSize = 22, TextColor3 = T.err, TextXAlignment = Enum.TextXAlignment.Center, Size = UDim2.fromScale(1, 1), ZIndex = 46 }).Parent = pb
-	local vp0 = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(1280, 720)
-	pb.Position = UDim2.fromOffset(vp0.X - 40, vp0.Y * 0.3)
-	pb.Parent = gui
-	do
-		local pressed, dragged, startIn, startPos, mv = false, false, nil, Vector2.new(0, 0), nil
-		pb.InputBegan:Connect(function(i)
-			if i.UserInputType ~= Enum.UserInputType.MouseButton1 and i.UserInputType ~= Enum.UserInputType.Touch then return end
-			pressed, dragged, startIn, mv = true, false, i.Position, i
-			startPos = Vector2.new(pb.Position.X.Offset, pb.Position.Y.Offset)
-			i.Changed:Connect(function()
-				if i.UserInputState == Enum.UserInputState.End and pressed then
-					pressed = false
-					if not dragged and os.clock() >= (Aurora.NoClose or 0) then panic() end
-				end
-			end)
-		end)
-		table.insert(conns, UIS.InputChanged:Connect(function(i)
-			if not pressed or i ~= mv then return end
-			local d = i.Position - startIn
-			if not dragged and d.Magnitude >= 10 then dragged = true end
-			if dragged then
-				local v = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(1280, 720)
-				pb.Position = UDim2.fromOffset(math.clamp(startPos.X + d.X, 20, v.X - 20), math.clamp(startPos.Y + d.Y, 20, v.Y - 20))
-			end
-		end))
-	end
-	pnS:AddToggle("Floating Panic Button", false, function(on) pb.Visible = on end)
-	pnS:AddLabel("Panic removes the UI, turns every feature off and restores the game's values. Run the script again to bring it back.")
-end
 
 local sPack = Settings:AddSection("Theme Packs & Backgrounds")
 do
