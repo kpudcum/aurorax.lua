@@ -4401,7 +4401,7 @@ do
 	local function buildUI()
 		local cam0 = workspace.CurrentCamera
 		local vp = cam0 and cam0.ViewportSize or Vector2.new(800, 400)
-		local touch = UIS.TouchEnabled
+		local touch = AIM_MOBILE or (UIS.TouchEnabled and not UIS.KeyboardEnabled)
 		local sg = Instance.new("ScreenGui")
 		sg.Name = "AuroraFreecamUI"
 		sg.ResetOnSpawn = false
@@ -4462,14 +4462,14 @@ do
 		table.insert(conns2, ex.Activated:Connect(doExit))
 		table.insert(conns2, ex.MouseButton1Click:Connect(doExit))
 		if touch then
-			local base = mk("Frame", { Size = UDim2.fromOffset(140, 140), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromOffset(105, vp.Y - 115), BackgroundColor3 = bg, BackgroundTransparency = 0.3, BorderSizePixel = 0, ZIndex = 10 }, sg)
+			local base = mk("Frame", { Size = UDim2.fromOffset(140, 140), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0, 105, 1, -115), BackgroundColor3 = bg, BackgroundTransparency = 0.3, BorderSizePixel = 0, ZIndex = 10 }, sg)
 			rnd(base, 70)
 			strk(base, accent, 2, 0.2)
 			local knob = mk("Frame", { Size = UDim2.fromOffset(60, 60), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), BackgroundColor3 = accent, BackgroundTransparency = 0.1, BorderSizePixel = 0, ZIndex = 11 }, base)
 			rnd(knob, 30)
 			onAccent(function(a) pcall(function() knob.BackgroundColor3 = a end) end)
 			local function mkBtn(sym, y)
-				local b = mk("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Size = UDim2.fromOffset(64, 64), Position = UDim2.fromOffset(vp.X - 55, vp.Y - y), BackgroundColor3 = bg, BackgroundTransparency = 0.2, BorderSizePixel = 0, ZIndex = 10 }, sg)
+				local b = mk("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Size = UDim2.fromOffset(64, 64), Position = UDim2.new(1, -55, 1, -y), BackgroundColor3 = bg, BackgroundTransparency = 0.2, BorderSizePixel = 0, ZIndex = 10 }, sg)
 				rnd(b, 32)
 				strk(b, accent, 2, 0.15)
 				txt(b, sym, 24, 11)
@@ -4537,7 +4537,7 @@ do
 		local cam = workspace.CurrentCamera
 		if not cam then return end
 		if cam.CameraType ~= Enum.CameraType.Scriptable then cam.CameraType = Enum.CameraType.Scriptable end
-		if UIS.TouchEnabled then pcall(function() UIS.MouseBehavior = Enum.MouseBehavior.Default end) end
+		if AIM_MOBILE then pcall(function() UIS.MouseBehavior = Enum.MouseBehavior.Default end) end
 		local typing = UIS:GetFocusedTextBox() ~= nil
 		local mx, mz, my, fast = FC.mv.X, -FC.mv.Y, FC.up, 1
 		-- dokunmatik bakis (sag taraf surukleme)
@@ -4576,6 +4576,7 @@ do
 		FC.vel = FC.vel:Lerp(target, 1 - math.exp(-dt * k * 0.6))
 		FC.pos = FC.pos + FC.vel * dt
 		cam.CFrame = CFrame.new(FC.pos) * rot
+		cam.Focus = cam.CFrame
 	end
 
 	local function startFC()
@@ -4600,6 +4601,7 @@ do
 		end)
 		-- karakter yerinde kalsin: oyun kontrolleri kapatilir (ayri thread, asla bloklamaz)
 		task.spawn(function()
+			if not FC.On then return end
 			pcall(function()
 				CAS:BindActionAtPriority("AuroraFreecamSink", sink, false, Enum.ContextActionPriority.High.Value, K.W, K.A, K.S, K.D, K.Space, K.Q, K.E, K.LeftControl, K.LeftShift)
 			end)
@@ -4637,8 +4639,13 @@ do
 			local cam = workspace.CurrentCamera
 			if cam and FC.saved then
 				local hum = lp.Character and lp.Character:FindFirstChildOfClass("Humanoid")
-				cam.CameraType = Enum.CameraType.Custom
-				cam.CameraSubject = hum or FC.saved.subject
+				local st = FC.saved.type
+				if st == Enum.CameraType.Scriptable then
+					cam.CFrame = FC.saved.cf
+				else
+					cam.CameraType = Enum.CameraType.Custom
+					cam.CameraSubject = hum or FC.saved.subject
+				end
 			end
 		end)
 	end
@@ -5252,7 +5259,7 @@ end)
 e3:AddToggle("Off-screen Arrows", false, function(on) ESP.Arrows = on end)
 e3:AddToggle("Skeleton", false, function(on) ESP.Skeleton = on end)
 
-local eInv = ESPTab:AddSection("Inventory & Held Item", true)
+local eInv = ESPTab:AddSection("Inventory & Held Item")
 eInv:AddToggle("Held Item", false, function(on) ESP.HeldItem = on end)
 eInv:AddToggle("Inventory", false, function(on) ESP.Inventory = on end)
 eInv:AddSlider("Max Items", 1, 8, 4, function(v) ESP.InvMax = math.floor(v) end)
@@ -5554,7 +5561,7 @@ if AIM_MOBILE then -- ekrandaki aim butonu ayarlari sadece telefonda gorunur
 	aBtn:AddLabel("Tap: toggles on/off in Toggle mode, hold in Hold mode. Drag to move.")
 end
 
-local a2 = AimTab:AddSection("Hitbox Integration", true)
+local a2 = AimTab:AddSection("Hitbox Integration")
 a2:AddToggle("Hitbox Enabled", false, function(on) Hit.Enabled = on end)
 a2:AddToggle("Head", false, function(on) Hit.Groups.Head = on end)
 a2:AddToggle("Torso (body)", false, function(on) Hit.Groups.Torso = on end)
@@ -5622,7 +5629,7 @@ do
 	sPack:AddDropdown("Background Preset", BGORDER, "Sec", function(o) applyBG(o) end)
 end
 
-local sThemeBg = Settings:AddSection("Theme Backgrounds", true)
+local sThemeBg = Settings:AddSection("Theme Backgrounds")
 sThemeBg:AddColorPicker("Background 0 (Top)", T.bg0, function(c) Aurora:UpdateThemeColor("bg0", c) end)
 sThemeBg:AddColorPicker("Background 1 (Bottom)", T.bg1, function(c) Aurora:UpdateThemeColor("bg1", c) end)
 sThemeBg:AddColorPicker("Sidebar Color", T.side, function(c) Aurora:UpdateThemeColor("side", c) end)
