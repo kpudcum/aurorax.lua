@@ -378,8 +378,10 @@ function Aurora:CreateWindow(titleText, subtitle)
 	-- slider surukleme sirasinda her harekette tum arayuzu yeniden olceklemek takiliyordu (ve slider'in kendisi de oynuyordu):
 	-- deger kisa bir duraklamadan sonra tek seferde, yumusak bir gecisle uygulanir
 	local scaleTok = 0
+	local userScale = nil -- kullanicinin sectigi menu boyutu: kapatip acinca (freecam dahil) korunur
 	function Aurora:SetMenuScale(scaleVal)
 		local target = math.clamp(scaleVal, 0.4, 1.5)
+		userScale = target
 		scaleTok = scaleTok + 1
 		local my = scaleTok
 		task.delay(0.12, function()
@@ -387,7 +389,7 @@ function Aurora:CreateWindow(titleText, subtitle)
 		end)
 	end
 	function Aurora:GetMenuScale()
-		return uiscale.Scale
+		return userScale or uiscale.Scale
 	end
 
 	new("ImageLabel", {
@@ -633,7 +635,7 @@ function Aurora:CreateWindow(titleText, subtitle)
 				holder.Position = UDim2.fromOffset(math.floor(vp.X / 2), math.floor(vp.Y / 2))
 			end
 			holder.Visible = true
-			tween(uiscale, 0.5, { Scale = fitScale() }, Enum.EasingStyle.Back)
+			tween(uiscale, 0.5, { Scale = userScale or fitScale() }, Enum.EasingStyle.Back)
 			tween(bgLayer, 0.35, { GroupTransparency = 0 })
 		else
 			tween(uiscale, 0.25, { Scale = initialScale }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
@@ -645,13 +647,13 @@ function Aurora:CreateWindow(titleText, subtitle)
 		if not gp and i.KeyCode == Enum.KeyCode.RightShift then setOpen(not isOpen) end
 	end))
 	closeB.MouseButton1Click:Connect(function()
-		if Aurora.FCActive or os.clock() < (Aurora.NoClose or 0) then return end
+		if os.clock() < (Aurora.NoClose or 0) then return end
 		warn("[Aurora] X butonuna basildi, pencere kapatiliyor")
 		setOpen(false)
 		task.delay(0.3, function() gui:Destroy() end)
 	end)
 	minB.MouseButton1Click:Connect(function()
-		if Aurora.FCActive or os.clock() < (Aurora.NoClose or 0) then return end
+		if os.clock() < (Aurora.NoClose or 0) then return end
 		setOpen(false)
 		task.delay(0.27, function()
 			if not isOpen then
@@ -4593,7 +4595,7 @@ do
 		cam.CameraType = Enum.CameraType.Scriptable
 		-- menu acik kalirsa kontrolleri ortbasar: freecam acilirken menu gizlenir, kapaninca geri acilir
 		FC.wasOpen = Window.IsOpen and Window.IsOpen() or false
-		if FC.wasOpen and Window.SetOpen then Window.SetOpen(false) end
+		FC.wasOpen = false -- menu acik kalir: freecam ayarlari freecam acikken de degistirilebilir
 		local okUI, errUI = pcall(function() FC.ui = buildUI() end)
 		if not okUI then Aurora:Notify("Freecam", "UI error: " .. tostring(errUI), 5, "error") end
 		RunService:BindToRenderStep("AuroraFreecam", Enum.RenderPriority.Last.Value + 1, function(dt)
