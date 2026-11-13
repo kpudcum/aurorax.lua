@@ -4387,7 +4387,9 @@ do
 
 	local function controls()
 		local ok, c = pcall(function()
-			return require(lp:WaitForChild("PlayerScripts"):WaitForChild("PlayerModule")):GetControls()
+			local ps = lp:FindFirstChild("PlayerScripts")
+			local pm = ps and ps:FindFirstChild("PlayerModule")
+			return pm and require(pm):GetControls() or nil
 		end)
 		return ok and c or nil
 	end
@@ -4562,27 +4564,34 @@ do
 		FC.pos = cam.CFrame.Position
 		FC.vel = Vector3.new(0, 0, 0)
 		FC.mv, FC.up, FC.look, FC.rmb = Vector2.new(0, 0), 0, Vector2.new(0, 0), false
-		cam.CameraType = Enum.CameraType.Scriptable
-		-- karakter yerinde kalsin: oyun kontrolleri kapatilir, tuslar sink edilir
-		local c = controls()
-		if c then pcall(function() c:Disable() end) end
-		pcall(function()
-			CAS:BindActionAtPriority("AuroraFreecamSink", sink, false, Enum.ContextActionPriority.High.Value, K.W, K.A, K.S, K.D, K.Space, K.Q, K.E, K.LeftControl, K.LeftShift)
-		end)
 		FC.On = true
+		cam.CameraType = Enum.CameraType.Scriptable
 		-- menu acik kalirsa kontrolleri ortbasar: freecam acilirken menu gizlenir, kapaninca geri acilir
 		FC.wasOpen = Window.IsOpen and Window.IsOpen() or false
 		if FC.wasOpen and Window.SetOpen then Window.SetOpen(false) end
 		local okUI, errUI = pcall(function() FC.ui = buildUI() end)
 		if not okUI then Aurora:Notify("Freecam", "UI error: " .. tostring(errUI), 5, "error") end
-		RunService:BindToRenderStep("AuroraFreecam", Enum.RenderPriority.Last.Value + 1, step)
+		RunService:BindToRenderStep("AuroraFreecam", Enum.RenderPriority.Last.Value + 1, function(dt)
+			local ok, e = pcall(step, dt)
+			if not ok and not FC.warned then FC.warned = true warn("[Aurora] freecam: " .. tostring(e)) end
+		end)
+		-- karakter yerinde kalsin: oyun kontrolleri kapatilir (ayri thread, asla bloklamaz)
+		task.spawn(function()
+			pcall(function()
+				CAS:BindActionAtPriority("AuroraFreecamSink", sink, false, Enum.ContextActionPriority.High.Value, K.W, K.A, K.S, K.D, K.Space, K.Q, K.E, K.LeftControl, K.LeftShift)
+			end)
+			local c = controls()
+			FC.ctl = c
+			if c and FC.On then pcall(function() c:Disable() end) end
+		end)
 	end
 	stopFC = function()
 		if not FC.On then return end
 		FC.On = false
 		pcall(function() RunService:UnbindFromRenderStep("AuroraFreecam") end)
 		pcall(function() CAS:UnbindAction("AuroraFreecamSink") end)
-		local c = controls()
+		local c = FC.ctl or controls()
+		FC.ctl = nil
 		if c then pcall(function() c:Enable() end) end
 		pcall(function() UIS.MouseBehavior = Enum.MouseBehavior.Default end)
 		if FC.ui then
