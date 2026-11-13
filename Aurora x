@@ -3670,7 +3670,7 @@ hCredits:AddCredit("3qr311", "Scripter")
 local Player = Window:AddTab("Player", "o")
 do
 	local pMv = Player:AddSection("Movement")
-	local MV = { SpeedMode = "Bypass", Speed = 16, JumpMode = "Bypass", Jump = 50, SB = false, JB = false, WasN = false, WasJ = false, BH = false, Boost = 12 }
+	local MV = { SpeedMode = "Bypass", Speed = 16, Jump = 50, SB = false, WasN = false, WasJ = false, BH = false, Boost = 12 }
 	local function myHum()
 		local char = lp.Character
 		return char and char:FindFirstChildOfClass("Humanoid")
@@ -3692,27 +3692,24 @@ do
 			MV.WasN = false
 		end
 	end
-	-- Normal: JumpPower yazilir. Bypass: JumpPower'a dokunmadan ziplama aninda yukari hiz verir
 	local function applyJump()
 		local h = myHum()
-		if MV.JumpMode == "Normal" then
-			customJumpPower = MV.Jump
-			jumpPowerEnabled = (MV.Jump ~= 50)
-			MV.JB = false
-			if not MV.WasJ and h then Aurora.Orig.JumpPower = h.JumpPower end
-			MV.WasJ = true
-			if h then
-				h.UseJumpPower = true
-				h.JumpPower = MV.Jump
-			end
-		else
+		if MV.Jump == 50 then
 			jumpPowerEnabled = false
-			MV.JB = MV.Jump > 50
 			if MV.WasJ and h then
 				h.UseJumpPower = true
 				h.JumpPower = Aurora.Orig.JumpPower or 50
 			end
 			MV.WasJ = false
+			return
+		end
+		customJumpPower = MV.Jump
+		jumpPowerEnabled = true
+		if h then
+			if not MV.WasJ then Aurora.Orig.JumpPower = h.JumpPower end
+			MV.WasJ = true
+			h.UseJumpPower = true
+			h.JumpPower = MV.Jump
 		end
 	end
 	pMv:AddDropdown("Speed Mode", { "Bypass", "Normal" }, "Bypass", function(o)
@@ -3722,10 +3719,6 @@ do
 	pMv:AddSlider("Walk Speed", 16, 300, 16, function(v)
 		MV.Speed = v
 		applySpeed()
-	end)
-	pMv:AddDropdown("Jump Mode", { "Bypass", "Normal" }, "Bypass", function(o)
-		MV.JumpMode = o
-		applyJump()
 	end)
 	pMv:AddSlider("Jump Power", 50, 300, 50, function(v)
 		MV.Jump = v
@@ -3738,7 +3731,7 @@ do
 		local h = myHum()
 		if h then h.Sit = on end
 	end)
-	pMv:AddLabel("Bypass mode moves you without changing WalkSpeed/JumpPower, so the game cannot see or reset it.")
+	pMv:AddLabel("Speed Mode - Bypass moves you with CFrame without changing WalkSpeed, so the game cannot see or reset it.")
 
 	table.insert(conns, RunService.Heartbeat:Connect(function(dt)
 		if Aurora.FlyFlag.On then return end
@@ -3760,16 +3753,6 @@ do
 				root.CFrame = root.CFrame + md.Unit * (MV.Boost * dt)
 			end
 		end
-	end))
-	table.insert(conns, UIS.JumpRequest:Connect(function()
-		if not MV.JB then return end
-		local char = lp.Character
-		local hum = char and char:FindFirstChildOfClass("Humanoid")
-		local root = char and (char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso"))
-		if not hum or not root or hum.Health <= 0 or hum.Sit then return end
-		if hum.FloorMaterial == Enum.Material.Air then return end
-		local v = root.AssemblyLinearVelocity
-		root.AssemblyLinearVelocity = Vector3.new(v.X, MV.Jump, v.Z)
 	end))
 end
 
@@ -4309,27 +4292,6 @@ do
 			end
 		end)
 	end)
-	local AK = { On = false, Hooked = false }
-	sv2:AddToggle("Anti Kick (client)", false, function(on)
-		AK.On = on
-		if not on or AK.Hooked then return end
-		local ok = pcall(function()
-			local old
-			local function hk(self, ...)
-				if AK.On and self == lp and string.lower(getnamecallmethod()) == "kick" then return nil end
-				return old(self, ...)
-			end
-			old = hookmetamethod(game, "__namecall", (newcclosure and newcclosure(hk)) or hk)
-		end)
-		if ok then
-			AK.Hooked = true
-			Aurora:Notify("Anti Kick", "Active: client-side Kick calls are blocked", 2.5, "success")
-		else
-			AK.On = false
-			Aurora:Notify("Anti Kick", "Not supported by your executor", 3, "error")
-		end
-	end)
-	gui.Destroying:Connect(function() AK.On = false end)
 	local AF = { On = false, Conn = nil }
 	local function afStop()
 		AF.On = false
@@ -4847,7 +4809,7 @@ end)
 -- 3b. TELEPORT SEKME
 do
 	local HttpService = game:GetService("HttpService")
-	local TP = { Mode = "Instant", Time = 1.2, Lift = 3, Selected = nil, Back = nil, Filter = "", Click = false, Lock = true, LockTime = 1.2, Speed = 140, Noclip = true, Snap = true, Job = 0, HoldConn = nil, SaveName = "", Coords = "" }
+	local TP = { Mode = "Instant", Time = 1.2, Lift = 3, Selected = nil, Back = nil, Filter = "", Click = false, SaveName = "", Coords = "" }
 	local SAVE_FILE = "AuroraX_Teleports.json"
 	local placeKey = tostring(game.PlaceId)
 	local saved = {}
@@ -4877,105 +4839,18 @@ do
 	local function say(msg, kind) Aurora:Notify("Teleport", msg, 2.5, kind or "success") end
 
 	local tweenObj = nil
-	local function stopHold()
-		if TP.HoldConn then TP.HoldConn:Disconnect() TP.HoldConn = nil end
-	end
-	gui.Destroying:Connect(stopHold)
-	local function zeroVel(r)
-		pcall(function()
-			r.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
-			r.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
-		end)
-	end
-	-- zemine gomulmeyi onler: hedefin altinda zemin varsa ayaklar zeminin ustune alinir
-	local function groundFix(cf, hum, r)
-		if not TP.Snap then return cf end
-		local params = RaycastParams.new()
-		params.FilterType = Enum.RaycastFilterType.Exclude
-		params.FilterDescendantsInstances = { lp.Character }
-		local res = workspace:Raycast(cf.Position + Vector3.new(0, 4, 0), Vector3.new(0, -80, 0), params)
-		if res then
-			local minY = res.Position.Y + (hum and hum.HipHeight or 2) + r.Size.Y / 2 + 0.3
-			if cf.Position.Y < minY then return cf + Vector3.new(0, minY - cf.Position.Y, 0) end
-		end
-		return cf
-	end
-	-- anti rubberband: oyun seni geri cekerse hedef konum kisa sure boyunca tekrar yazilir
-	local function hold(target, job)
-		stopHold()
-		if not TP.Lock or TP.LockTime <= 0 then return end
-		local t0 = os.clock()
-		TP.HoldConn = RunService.Heartbeat:Connect(function()
-			local r = rootOf(lp)
-			if job ~= TP.Job or not r or os.clock() - t0 > TP.LockTime or Aurora.FlyFlag.On then stopHold() return end
-			local hum = lp.Character and lp.Character:FindFirstChildOfClass("Humanoid")
-			-- oyuncu yurumeye basladiysa birak, yoksa hareketle savasir
-			if os.clock() - t0 > 0.3 and hum and hum.MoveDirection.Magnitude > 0.1 then stopHold() return end
-			if (r.Position - target.Position).Magnitude > 3 then r.CFrame = target end
-			zeroVel(r)
-		end)
-	end
 	local function goCF(cf, noLift)
 		local r = rootOf(lp)
 		if not r then say("Character not found", "error") return false end
 		TP.Back = r.CFrame
-		TP.Job = TP.Job + 1
-		local job = TP.Job
-		stopHold()
 		if tweenObj then tweenObj:Cancel() tweenObj = nil end
-		local hum = lp.Character and lp.Character:FindFirstChildOfClass("Humanoid")
 		local target = noLift and cf or (cf + Vector3.new(0, TP.Lift, 0))
-		target = groundFix(target, hum, r)
 		if TP.Mode == "Smooth" then
 			tweenObj = TweenService:Create(r, TweenInfo.new(TP.Time, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut), { CFrame = target })
-			tweenObj.Completed:Connect(function()
-				if job == TP.Job then hold(target, job) end
-			end)
 			tweenObj:Play()
-		elseif TP.Mode == "Stepped (Bypass)" then
-			-- ani isinlanma yerine sabit hizla kucuk adimlarla ilerler (hiz kontrolu yapan anti-cheat'leri atlatir); yolda duvarlar engellemesin diye noclip
-			local saved = {}
-			if TP.Noclip and lp.Character then
-				for _, p in ipairs(lp.Character:GetDescendants()) do
-					if p:IsA("BasePart") and p.CanCollide then
-						table.insert(saved, p)
-						p.CanCollide = false
-					end
-				end
-			end
-			local function restore()
-				for _, p in ipairs(saved) do
-					if p.Parent then p.CanCollide = true end
-				end
-			end
-			local conn
-			conn = RunService.Stepped:Connect(function(_, dt)
-				local rr = rootOf(lp)
-				if job ~= TP.Job or not rr then
-					conn:Disconnect()
-					restore()
-					return
-				end
-				local diff = target.Position - rr.Position
-				local step = TP.Speed * dt
-				if diff.Magnitude <= step then
-					conn:Disconnect()
-					restore()
-					rr.CFrame = target
-					zeroVel(rr)
-					hold(target, job)
-					return
-				end
-				for _, p in ipairs(saved) do
-					if p.Parent and p.CanCollide then p.CanCollide = false end
-				end
-				rr.CFrame = CFrame.new(rr.Position + diff.Unit * step) * (rr.CFrame - rr.CFrame.Position)
-				zeroVel(rr)
-			end)
 		else
-			zeroVel(r)
+			pcall(function() r.AssemblyLinearVelocity = Vector3.new(0, 0, 0) end)
 			r.CFrame = target
-			hold(target, job)
 		end
 		return true
 	end
@@ -5234,19 +5109,12 @@ do
 
 	------------------------------------------------ AYARLAR
 	local tp4 = Tele:AddSection("Teleport Settings")
-	tp4:AddDropdown("Mode", { "Instant", "Smooth", "Stepped (Bypass)" }, "Instant", function(o) TP.Mode = o end)
+	tp4:AddDropdown("Mode", { "Instant", "Smooth" }, "Instant", function(o) TP.Mode = o end)
 	tp4:AddSlider("Smooth Duration (s)", 0.2, 6, 1.2, function(v) TP.Time = v end, 0.1)
 	tp4:AddSlider("Height Offset (studs)", 0, 20, 3, function(v) TP.Lift = v end, 0.5)
 	tp4:AddToggle("Click / Tap Teleport", false, function(on) TP.Click = on end)
 	tp4:AddLabel("PC: hold Ctrl + click. Mobile: tap the screen.")
 
-	local tpB = Tele:AddSection("Teleport Bypass")
-	tpB:AddToggle("Anti Rubberband (hold position)", true, function(on) TP.Lock = on end)
-	tpB:AddSlider("Hold Time (s)", 0.2, 5, 1.2, function(v) TP.LockTime = v end, 0.1)
-	tpB:AddSlider("Step Speed (studs/s)", 40, 400, 140, function(v) TP.Speed = v end, 5)
-	tpB:AddToggle("Noclip While Stepping", true, function(on) TP.Noclip = on end)
-	tpB:AddToggle("Ground Snap (anti stuck)", true, function(on) TP.Snap = on end)
-	tpB:AddLabel("If a game pulls you back, use Mode: Stepped (Bypass). Lower step speed is safer.")
 	local function rayHit(ray)
 		local ignore = {}
 		if lp.Character then table.insert(ignore, lp.Character) end
