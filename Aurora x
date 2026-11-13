@@ -2559,6 +2559,7 @@ local ESP = {
 	Inventory = false,
 	InvMax = 4,
 	InvScale = 100,
+	InvDist = true,
 	TeamColor = false,
 	VisColor = false,
 	Rainbow = false,
@@ -2750,8 +2751,11 @@ function INV.scan(model, player)
 	return held, names, #order
 end
 
-function INV.draw(d, g, x, y, ts, far, c)
-	ts = math.max(7, math.floor(ts * ESP.InvScale / 100 + .5))
+function INV.draw(d, g, x, y, ts, far, c, h)
+	-- uzaklastikca (kutu kuculdukce) kart da kuculur: oyuncunun yaninda sabit piksel boyutunda buyuk durmaz
+	local k = 1
+	if ESP.InvDist and h then k = math.clamp(h / 170, 0.5, 1) end
+	ts = math.max(7, math.floor(ts * ESP.InvScale / 100 * k + .5))
 	local ih = ts + 3
 	local tagW = math.floor(ts * 3.6)
 	local tr = Lang == 'tr'
@@ -2784,7 +2788,7 @@ function INV.draw(d, g, x, y, ts, far, c)
 		if nm.Visible then nm.Visible = false end
 	end
 	if n == 0 then show(g, false) return 0 end
-	local cw = math.clamp(math.floor(ts * 13), 104, 230)
+	local cw = math.clamp(math.floor(ts * 13), 80, 230)
 	g.card.Size = UDim2.fromOffset(cw, n * ih + 6)
 	g.card.Position = UDim2.fromOffset(x - math.floor(cw * .5), y)
 	g.st.Color = c; g.bar.BackgroundColor3 = c
@@ -3072,7 +3076,7 @@ local function drawESP(d, cam, camCF)
 
 	if (ESP.HeldItem or ESP.Inventory) and h >= 20 then
 		local g = grp(d, 'inv', INV.build)
-		INV.draw(d, g, mx, by + 2, ts, far, c)
+		INV.draw(d, g, mx, by + 2, ts, far, c, h)
 	else
 		show(d.g.inv, false)
 	end
@@ -3674,12 +3678,12 @@ hCredits:AddCredit("3qr311", "Scripter")
 local Player = Window:AddTab("Player", "o")
 do
 	local pMv = Player:AddSection("Movement")
-	local MV = { SpeedMode = "Bypass", Speed = 16, Jump = 50, SB = false, WasN = false, WasJ = false, BH = false, Boost = 12 }
+	local MV = { SpeedMode = "CFrame", Speed = 16, Jump = 50, SB = false, WasN = false, WasJ = false, BH = false, Boost = 12 }
 	local function myHum()
 		local char = lp.Character
 		return char and char:FindFirstChildOfClass("Humanoid")
 	end
-	-- Normal: Humanoid.WalkSpeed degeri yazilir (oyun geri alirsa surekli uygulanir). Bypass: WalkSpeed'e dokunmadan CFrame ile ilerletir
+	-- Normal: Humanoid.WalkSpeed degeri yazilir (oyun geri alirsa surekli uygulanir). CFrame: WalkSpeed'e dokunmadan CFrame ile ilerletir
 	local function applySpeed()
 		local h = myHum()
 		if MV.SpeedMode == "Normal" then
@@ -3716,7 +3720,7 @@ do
 			h.JumpPower = MV.Jump
 		end
 	end
-	pMv:AddDropdown("Speed Mode", { "Bypass", "Normal" }, "Bypass", function(o)
+	pMv:AddDropdown("Speed Mode", { "CFrame", "Normal" }, "CFrame", function(o)
 		MV.SpeedMode = o
 		applySpeed()
 	end)
@@ -3735,7 +3739,7 @@ do
 		local h = myHum()
 		if h then h.Sit = on end
 	end)
-	pMv:AddLabel("Speed Mode - Bypass moves you with CFrame without changing WalkSpeed, so the game cannot see or reset it.")
+	pMv:AddLabel("Speed Mode - CFrame moves you with CFrame without changing WalkSpeed, so the game cannot see or reset it.")
 
 	table.insert(conns, RunService.Heartbeat:Connect(function(dt)
 		if Aurora.FlyFlag.On then return end
@@ -5270,6 +5274,7 @@ local eInv = ESPTab:AddSection("Inventory & Held Item")
 eInv:AddToggle("Held Item", false, function(on) ESP.HeldItem = on end)
 eInv:AddToggle("Inventory", false, function(on) ESP.Inventory = on end)
 eInv:AddSlider("Max Items", 1, 8, 4, function(v) ESP.InvMax = math.floor(v) end)
+eInv:AddToggle("Shrink With Distance", true, function(on) ESP.InvDist = on end)
 eInv:AddSlider("Card Size (%)", 50, 200, 100, function(v) ESP.InvScale = math.floor(v) end)
 
 local e4 = ESPTab:AddSection("NPC ESP")
@@ -5585,8 +5590,20 @@ a2:AddToggle("No Collide", false, function(on) Hit.NoCollide = on end)
 -- 7. SETTINGS SEKME
 local Settings = Window:AddTab("Settings", "o")
 local s1 = Settings:AddSection("Appearance & Scale")
-s1:AddDropdown("Theme", { "Violet", "Ocean", "Mint", "Rose", "Amber", "Crimson", "Red", "Orange", "Gold", "Lime", "Emerald", "Teal", "Cyan", "Sky", "Blue", "Indigo", "Purple", "Magenta", "Pink", "Silver", "White" }, "Violet", function(o) Aurora:SetAccent(o, true) end)
-s1:AddColorPicker("Custom accent", ACCENTS.Violet, function(c) Aurora:SetAccent(c, true) end)
+s1:AddDropdown("Theme", { "Violet", "Ocean", "Mint", "Rose", "Amber", "Crimson", "Red", "Orange", "Gold", "Lime", "Emerald", "Teal", "Cyan", "Sky", "Blue", "Indigo", "Purple", "Magenta", "Pink", "Silver", "White" }, "Violet", function(o)
+	if isRainbowAccent then
+		Aurora:Notify("Theme", "Turn off Rainbow Accent first to pick a theme color.", 3, "warn")
+		return
+	end
+	Aurora:SetAccent(o, true)
+end)
+s1:AddColorPicker("Custom accent", ACCENTS.Violet, function(c)
+	if isRainbowAccent then
+		Aurora:Notify("Theme", "Turn off Rainbow Accent first to pick a theme color.", 3, "warn")
+		return
+	end
+	Aurora:SetAccent(c, true)
+end)
 s1:AddToggle("Rainbow Accent", false, function(on)
 	isRainbowAccent = on
 	if not on then
