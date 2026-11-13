@@ -4395,97 +4395,124 @@ do
 
 	-- mobil: sol joystick (hareket), sag tarafa surukle (bakis), yukari/asagi butonlari ve cikis
 	local function buildUI()
-		local vp = workspace.CurrentCamera.ViewportSize
-		local root = new("Frame", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, BorderSizePixel = 0, Active = false, ZIndex = 50 })
+		local cam0 = workspace.CurrentCamera
+		local vp = cam0 and cam0.ViewportSize or Vector2.new(800, 400)
+		local touch = UIS.TouchEnabled
+		local sg = Instance.new("ScreenGui")
+		sg.Name = "AuroraFreecamUI"
+		sg.ResetOnSpawn = false
+		sg.IgnoreGuiInset = true
+		sg.DisplayOrder = 250
+		sg.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+		sg.Parent = host
 		local conns2 = {}
-		-- ekran ustunde kontrol ipucu: ilk saniyelerde net, sonra soluklasir
-		local hintText = UIS.KeyboardEnabled and ("FREECAM  |  WASD move  |  Space / Ctrl up-down  |  Shift fast  |  hold Right Mouse to look  |  " .. tostring(FC.Key.value and FC.Key.value.Name or "key") .. " to exit")
-			or "FREECAM  |  Left stick: move  |  Drag right side: look  |  Exit: top button"
-		local hint = label({ Text = hintText, Font = Enum.Font.GothamBold, TextSize = 11, TextColor3 = T.text, TextXAlignment = Enum.TextXAlignment.Center, AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 14), Size = UDim2.fromOffset(math.min(vp.X - 20, 640), 26), ZIndex = 53 })
-		hint.BackgroundTransparency = 0.2
-		hint.BackgroundColor3 = T.card
-		corner(13).Parent = hint
-		local hst = stroke(accent, 1.5, 0.3)
-		hst.Parent = hint
-		onAccent(function(a) hst.Color = a end)
-		hint.Parent = root
+		local function mk(cls, props, parent)
+			local o = Instance.new(cls)
+			for k, v in pairs(props) do o[k] = v end
+			o.Parent = parent
+			return o
+		end
+		local function rnd(o, r)
+			local c = Instance.new("UICorner")
+			c.CornerRadius = UDim.new(0, r)
+			c.Parent = o
+		end
+		local function strk(o, col, th, tr)
+			local s = Instance.new("UIStroke")
+			s.Color = col
+			s.Thickness = th
+			s.Transparency = tr
+			s.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+			s.Parent = o
+			return s
+		end
+		local function txt(parent, t, size, z)
+			return mk("TextLabel", { Text = t, Font = Enum.Font.GothamBold, TextSize = size, TextColor3 = Color3.new(1, 1, 1), BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), ZIndex = z, TextXAlignment = Enum.TextXAlignment.Center }, parent)
+		end
+		local bg = Color3.fromRGB(18, 18, 28)
+		local hintText = touch and "FREECAM  |  Left pad: move  |  Drag screen: look  |  Up / Down buttons"
+			or ("FREECAM  |  WASD move  |  Space / Ctrl up-down  |  Shift fast  |  hold Right Mouse to look  |  " .. tostring(FC.Key.value and FC.Key.value.Name or "key") .. " to exit")
+		local hint = mk("TextLabel", { Text = hintText, Font = Enum.Font.GothamBold, TextSize = 12, TextColor3 = Color3.new(1, 1, 1), BackgroundColor3 = bg, BackgroundTransparency = 0.15, AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 10), Size = UDim2.fromOffset(math.min(vp.X - 20, 620), 28), ZIndex = 20, BorderSizePixel = 0 }, sg)
+		rnd(hint, 14)
+		local hst = strk(hint, accent, 1.5, 0.2)
+		table.insert(conns2, { Disconnect = function() end })
+		onAccent(function(a) pcall(function() hst.Color = a end) end)
 		task.delay(8, function()
 			if hint.Parent then
-				tween(hint, 0.8, { BackgroundTransparency = 0.75, TextTransparency = 0.55 })
-				tween(hst, 0.8, { Transparency = 0.8 })
+				pcall(tween, hint, 0.8, { BackgroundTransparency = 0.8, TextTransparency = 0.5 })
 			end
 		end)
-		if UIS.TouchEnabled then
-		local base = new("Frame", { Size = UDim2.fromOffset(130, 130), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromOffset(100, vp.Y - 110), BackgroundColor3 = T.card, BackgroundTransparency = 0.35, BorderSizePixel = 0, Active = true, ZIndex = 51 }, { corner(65) })
-		local bst = stroke(accent, 2, 0.3)
-		bst.Parent = base
-		onAccent(function(a) bst.Color = a end)
-		local knob = new("Frame", { Size = UDim2.fromOffset(56, 56), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), BackgroundColor3 = accent, BackgroundTransparency = 0.15, BorderSizePixel = 0, ZIndex = 52 }, { corner(28) })
-		onAccent(function(a) knob.BackgroundColor3 = a end)
-		knob.Parent = base
-		base.Parent = root
-		local jIn, jStart, lookIn = nil, nil, nil
-		base.InputBegan:Connect(function(i)
-			if i.UserInputType == Enum.UserInputType.Touch and not jIn then
-				jIn, jStart = i, i.Position
-			end
-		end)
-		table.insert(conns2, UIS.InputChanged:Connect(function(i)
-			if i == jIn then
-				local d = Vector2.new(i.Position.X - jStart.X, i.Position.Y - jStart.Y) / 60
-				if d.Magnitude > 1 then d = d.Unit end
-				FC.mv = d
-				knob.Position = UDim2.new(0.5, d.X * 45, 0.5, d.Y * 45)
-			elseif i == lookIn then
-				FC.look = FC.look + Vector2.new(i.Delta.X, i.Delta.Y)
-			end
-		end))
-		table.insert(conns2, UIS.InputBegan:Connect(function(i, gp)
-			if gp or i.UserInputType ~= Enum.UserInputType.Touch or lookIn or i == jIn then return end
-			if i.Position.X > vp.X * 0.35 then lookIn = i end
-		end))
-		table.insert(conns2, UIS.InputEnded:Connect(function(i)
-			if i == jIn then
-				jIn = nil
-				FC.mv = Vector2.new(0, 0)
-				knob.Position = UDim2.fromScale(0.5, 0.5)
-			elseif i == lookIn then
-				lookIn = nil
-			end
-		end))
-		local function mkBtn(txt, y, setter)
-			local b = new("TextButton", { Text = "", AutoButtonColor = false, AnchorPoint = Vector2.new(0.5, 0.5), Size = UDim2.fromOffset(52, 52), Position = UDim2.fromOffset(vp.X - 50, vp.Y - y), BackgroundColor3 = T.card, BackgroundTransparency = 0.25, BorderSizePixel = 0, ZIndex = 51 }, { corner(26) })
-			local st = stroke(accent, 2, 0.2)
-			st.Parent = b
-			onAccent(function(a) st.Color = a end)
-			label({ Text = txt, Font = Enum.Font.GothamBlack, TextSize = 22, TextColor3 = T.text, TextXAlignment = Enum.TextXAlignment.Center, Size = UDim2.fromScale(1, 1), ZIndex = 52 }).Parent = b
-			b.InputBegan:Connect(function(i)
-				if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then setter(true) end
-			end)
-			b.InputEnded:Connect(function(i)
-				if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then setter(false) end
-			end)
-			b.Parent = root
-		end
-		mkBtn("^", 150, function(v) FC.up = v and 1 or (FC.up == 1 and 0 or FC.up) end)
-		mkBtn("v", 80, function(v) FC.up = v and -1 or (FC.up == -1 and 0 or FC.up) end)
-		local ex = new("TextButton", { Text = "", AutoButtonColor = false, AnchorPoint = Vector2.new(0.5, 0), Size = UDim2.fromOffset(130, 30), Position = UDim2.fromOffset(vp.X / 2, 64), BackgroundColor3 = T.card, BackgroundTransparency = 0.2, BorderSizePixel = 0, ZIndex = 51 }, { corner(15) })
-		local est = stroke(T.err, 1.5, 0.2)
-		est.Parent = ex
-		label({ Text = "EXIT FREECAM", Font = Enum.Font.GothamBold, TextSize = 11, TextColor3 = T.text, TextXAlignment = Enum.TextXAlignment.Center, Size = UDim2.fromScale(1, 1), ZIndex = 52 }).Parent = ex
-		ex.MouseButton1Click:Connect(function()
+		-- cikis butonu (hem mobil hem PC)
+		local ex = mk("TextButton", { Text = "", AutoButtonColor = false, AnchorPoint = Vector2.new(0.5, 0), Size = UDim2.fromOffset(140, 32), Position = UDim2.new(0.5, 0, 0, 46), BackgroundColor3 = bg, BackgroundTransparency = 0.1, BorderSizePixel = 0, ZIndex = 30 }, sg)
+		rnd(ex, 16)
+		strk(ex, Color3.fromRGB(255, 107, 122), 1.5, 0.1)
+		txt(ex, "EXIT FREECAM", 12, 31)
+		table.insert(conns2, ex.Activated:Connect(function()
 			if fcToggle then fcToggle.Set(false) else stopFC() end
-		end)
-		ex.Parent = root
+		end))
+		if touch then
+			-- bakis alani: tum ekran, kontrollerin altinda
+			local pad = mk("Frame", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Active = true, ZIndex = 1, BorderSizePixel = 0 }, sg)
+			local base = mk("Frame", { Size = UDim2.fromOffset(140, 140), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromOffset(105, vp.Y - 115), BackgroundColor3 = bg, BackgroundTransparency = 0.3, BorderSizePixel = 0, Active = true, ZIndex = 10 }, sg)
+			rnd(base, 70)
+			strk(base, accent, 2, 0.2)
+			local knob = mk("Frame", { Size = UDim2.fromOffset(60, 60), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), BackgroundColor3 = accent, BackgroundTransparency = 0.1, BorderSizePixel = 0, ZIndex = 11 }, base)
+			rnd(knob, 30)
+			onAccent(function(a) pcall(function() knob.BackgroundColor3 = a end) end)
+			local jIn, jStart, lookIn = nil, nil, nil
+			table.insert(conns2, base.InputBegan:Connect(function(i)
+				if i.UserInputType == Enum.UserInputType.Touch and not jIn then
+					jIn = i
+					jStart = base.AbsolutePosition + base.AbsoluteSize / 2
+				end
+			end))
+			table.insert(conns2, pad.InputBegan:Connect(function(i)
+				if i.UserInputType == Enum.UserInputType.Touch and not lookIn then lookIn = i end
+			end))
+			table.insert(conns2, UIS.InputChanged:Connect(function(i)
+				if i == jIn then
+					local d = Vector2.new(i.Position.X - jStart.X, i.Position.Y - jStart.Y) / 55
+					if d.Magnitude > 1 then d = d.Unit end
+					FC.mv = d
+					knob.Position = UDim2.new(0.5, d.X * 40, 0.5, d.Y * 40)
+				elseif i == lookIn then
+					FC.look = FC.look + Vector2.new(i.Delta.X, i.Delta.Y)
+				end
+			end))
+			table.insert(conns2, UIS.InputEnded:Connect(function(i)
+				if i == jIn then
+					jIn = nil
+					FC.mv = Vector2.new(0, 0)
+					knob.Position = UDim2.fromScale(0.5, 0.5)
+				elseif i == lookIn then
+					lookIn = nil
+				end
+			end))
+			local function mkBtn(sym, y, dirv)
+				local b = mk("TextButton", { Text = "", AutoButtonColor = false, AnchorPoint = Vector2.new(0.5, 0.5), Size = UDim2.fromOffset(60, 60), Position = UDim2.fromOffset(vp.X - 55, vp.Y - y), BackgroundColor3 = bg, BackgroundTransparency = 0.2, BorderSizePixel = 0, ZIndex = 10 }, sg)
+				rnd(b, 30)
+				strk(b, accent, 2, 0.15)
+				txt(b, sym, 24, 11)
+				table.insert(conns2, b.InputBegan:Connect(function(i)
+					if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then FC.up = dirv end
+				end))
+				table.insert(conns2, b.InputEnded:Connect(function(i)
+					if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then
+						if FC.up == dirv then FC.up = 0 end
+					end
+				end))
+			end
+			mkBtn("^", 170, 1)
+			mkBtn("v", 95, -1)
 		end
-		root.Parent = gui
-		return { root = root, conns = conns2 }
+		return { root = sg, conns = conns2 }
 	end
 
 	local function step(dt)
 		local cam = workspace.CurrentCamera
 		if not cam then return end
 		if cam.CameraType ~= Enum.CameraType.Scriptable then cam.CameraType = Enum.CameraType.Scriptable end
+		if UIS.TouchEnabled then pcall(function() UIS.MouseBehavior = Enum.MouseBehavior.Default end) end
 		local typing = UIS:GetFocusedTextBox() ~= nil
 		local mx, mz, my, fast = FC.mv.X, -FC.mv.Y, FC.up, 1
 		-- dokunmatik bakis (sag taraf surukleme)
