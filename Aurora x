@@ -645,11 +645,13 @@ function Aurora:CreateWindow(titleText, subtitle)
 		if not gp and i.KeyCode == Enum.KeyCode.RightShift then setOpen(not isOpen) end
 	end))
 	closeB.MouseButton1Click:Connect(function()
+		if os.clock() < (Aurora.NoClose or 0) then return end
 		warn("[Aurora] X butonuna basildi, pencere kapatiliyor")
 		setOpen(false)
 		task.delay(0.3, function() gui:Destroy() end)
 	end)
 	minB.MouseButton1Click:Connect(function()
+		if os.clock() < (Aurora.NoClose or 0) then return end
 		setOpen(false)
 		task.delay(0.27, function()
 			if not isOpen then
@@ -4627,9 +4629,9 @@ do
 		local reopen = FC.wasOpen and not FC.dying
 		FC.wasOpen = false
 		if reopen then
-			task.delay(0.8, function()
-				if not FC.On and not FC.dying then pcall(function() Window.SetOpen(true) end) end
-			end)
+			-- menu aninda geri gelir; parmak hala ekrandayken X/minimize yanlislikla tetiklenmesin diye kisa koruma
+			Aurora.NoClose = os.clock() + 0.9
+			pcall(function() Window.SetOpen(true) end)
 		end
 		pcall(function()
 			local cam = workspace.CurrentCamera
