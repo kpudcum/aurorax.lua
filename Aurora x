@@ -4381,7 +4381,7 @@ do
 	local fcS = Visuals:AddSection("Freecam")
 	local FC = { On = false, Speed = 50, Fast = 3, Smooth = 35, Sens = 0.3, Key = { kind = "key", value = Enum.KeyCode.P },
 		yaw = 0, pitch = 0, cyaw = 0, cpitch = 0, pos = Vector3.new(0, 0, 0), vel = Vector3.new(0, 0, 0), saved = nil,
-		mv = Vector2.new(0, 0), up = 0, look = Vector2.new(0, 0), ui = nil, rmb = false, cn = {} }
+		mv = Vector2.new(0, 0), up = 0, look = Vector2.new(0, 0), ui = nil, rmb = false, cn = {}, FOV = nil, stream = 0, wheel = nil }
 	local CAS = game:GetService("ContextActionService")
 	local fcToggle = nil
 	local stopFC
@@ -4400,12 +4400,11 @@ do
 	-- mobil: sol joystick (hareket), sag tarafa surukle (bakis), yukari/asagi butonlari ve cikis
 	local function buildUI()
 		local cam0 = workspace.CurrentCamera
-		local vp = cam0 and cam0.ViewportSize or Vector2.new(800, 400)
 		local touch = UIS.TouchEnabled
 		local sg = Instance.new("ScreenGui")
 		sg.Name = "AuroraFreecamUI"
 		sg.ResetOnSpawn = false
-		sg.IgnoreGuiInset = true
+		sg.IgnoreGuiInset = false
 		sg.DisplayOrder = 250
 		sg.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 		sg.Parent = host
@@ -4435,8 +4434,9 @@ do
 		end
 		local bg = Color3.fromRGB(18, 18, 28)
 		local hintText = touch and "FREECAM  |  Left pad: move  |  Drag screen: look  |  Up / Down buttons"
-			or ("FREECAM  |  WASD move  |  Space / Ctrl up-down  |  Shift fast  |  hold Right Mouse to look  |  " .. tostring(FC.Key.value and FC.Key.value.Name or "key") .. " to exit")
-		local hint = mk("TextLabel", { Text = hintText, Font = Enum.Font.GothamBold, TextSize = 12, TextColor3 = Color3.new(1, 1, 1), BackgroundColor3 = bg, BackgroundTransparency = 0.15, AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 10), Size = UDim2.fromOffset(math.min(vp.X - 20, 620), 28), ZIndex = 20, BorderSizePixel = 0 }, sg)
+			or ("FREECAM  |  WASD move  |  Space/Ctrl up-down  |  Shift fast  |  Hold RMB: look  |  Scroll: speed  |  " .. tostring(FC.Key.value and FC.Key.value.Name or "key") .. " to exit")
+		local hint = mk("TextLabel", { Text = hintText, Font = Enum.Font.GothamBold, TextSize = 12, TextColor3 = Color3.new(1, 1, 1), BackgroundColor3 = bg, BackgroundTransparency = 0.15, AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 6), Size = UDim2.new(1, -20, 0, 40), ZIndex = 20, BorderSizePixel = 0, TextWrapped = true }, sg)
+		mk("UISizeConstraint", { MaxSize = Vector2.new(620, 40) }, hint)
 		rnd(hint, 14)
 		local hst = strk(hint, accent, 1.5, 0.2)
 		table.insert(conns2, { Disconnect = function() end })
@@ -4447,7 +4447,7 @@ do
 			end
 		end)
 		-- cikis butonu (hem mobil hem PC)
-		local ex = mk("TextButton", { Text = "", AutoButtonColor = false, AnchorPoint = Vector2.new(0.5, 0), Size = UDim2.fromOffset(140, 32), Position = UDim2.new(0.5, 0, 0, 46), BackgroundColor3 = bg, BackgroundTransparency = 0.1, BorderSizePixel = 0, ZIndex = 30 }, sg)
+		local ex = mk("TextButton", { Text = "", AutoButtonColor = false, AnchorPoint = Vector2.new(0.5, 0), Size = UDim2.fromOffset(140, 32), Position = UDim2.new(0.5, 0, 0, 52), BackgroundColor3 = bg, BackgroundTransparency = 0.1, BorderSizePixel = 0, ZIndex = 30 }, sg)
 		rnd(ex, 16)
 		strk(ex, Color3.fromRGB(255, 107, 122), 1.5, 0.1)
 		txt(ex, "EXIT FREECAM", 12, 31)
@@ -4462,14 +4462,14 @@ do
 		table.insert(conns2, ex.Activated:Connect(doExit))
 		table.insert(conns2, ex.MouseButton1Click:Connect(doExit))
 		if touch then
-			local base = mk("Frame", { Size = UDim2.fromOffset(140, 140), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromOffset(105, vp.Y - 115), BackgroundColor3 = bg, BackgroundTransparency = 0.3, BorderSizePixel = 0, ZIndex = 10 }, sg)
+			local base = mk("Frame", { Size = UDim2.fromOffset(140, 140), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0, 105, 1, -115), BackgroundColor3 = bg, BackgroundTransparency = 0.3, BorderSizePixel = 0, ZIndex = 10 }, sg)
 			rnd(base, 70)
 			strk(base, accent, 2, 0.2)
 			local knob = mk("Frame", { Size = UDim2.fromOffset(60, 60), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), BackgroundColor3 = accent, BackgroundTransparency = 0.1, BorderSizePixel = 0, ZIndex = 11 }, base)
 			rnd(knob, 30)
 			onAccent(function(a) pcall(function() knob.BackgroundColor3 = a end) end)
 			local function mkBtn(sym, y)
-				local b = mk("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Size = UDim2.fromOffset(64, 64), Position = UDim2.fromOffset(vp.X - 55, vp.Y - y), BackgroundColor3 = bg, BackgroundTransparency = 0.2, BorderSizePixel = 0, ZIndex = 10 }, sg)
+				local b = mk("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Size = UDim2.fromOffset(64, 64), Position = UDim2.new(1, -55, 1, -y), BackgroundColor3 = bg, BackgroundTransparency = 0.2, BorderSizePixel = 0, ZIndex = 10 }, sg)
 				rnd(b, 32)
 				strk(b, accent, 2, 0.15)
 				txt(b, sym, 24, 11)
@@ -4576,19 +4576,31 @@ do
 		FC.vel = FC.vel:Lerp(target, 1 - math.exp(-dt * k * 0.6))
 		FC.pos = FC.pos + FC.vel * dt
 		cam.CFrame = CFrame.new(FC.pos) * rot
+		cam.Focus = cam.CFrame
+		if FC.FOV and cam.FieldOfView ~= FC.FOV then cam.FieldOfView = FC.FOV end
+		FC.stream = FC.stream - dt
+		if FC.stream <= 0 and workspace.StreamingEnabled then
+			FC.stream = 1.5
+			task.spawn(function() pcall(function() lp:RequestStreamAroundAsync(FC.pos) end) end)
+		end
 	end
 
 	local function startFC()
 		local cam = workspace.CurrentCamera
 		if not cam or FC.On then return end
-		FC.saved = { type = cam.CameraType, subject = cam.CameraSubject, cf = cam.CFrame }
+		FC.saved = { type = cam.CameraType, subject = cam.CameraSubject, cf = cam.CFrame, fov = cam.FieldOfView }
 		local rx, ry = cam.CFrame:ToOrientation()
 		FC.pitch, FC.yaw, FC.cpitch, FC.cyaw = rx, ry, rx, ry
 		FC.pos = cam.CFrame.Position
 		FC.vel = Vector3.new(0, 0, 0)
 		FC.mv, FC.up, FC.look, FC.rmb = Vector2.new(0, 0), 0, Vector2.new(0, 0), false
 		FC.On = true
+		FC.stream = 0
 		cam.CameraType = Enum.CameraType.Scriptable
+		FC.wheel = UIS.InputChanged:Connect(function(i, gp)
+			if gp or i.UserInputType ~= Enum.UserInputType.MouseWheel then return end
+			FC.Speed = math.clamp(FC.Speed * (1 + 0.12 * i.Position.Z), 5, 300)
+		end)
 		-- menu acik kalirsa kontrolleri ortbasar: freecam acilirken menu gizlenir, kapaninca geri acilir
 		FC.wasOpen = Window.IsOpen and Window.IsOpen() or false
 		if FC.wasOpen and Window.SetOpen then Window.SetOpen(false) end
@@ -4613,6 +4625,7 @@ do
 		FC.On = false
 		pcall(function() RunService:UnbindFromRenderStep("AuroraFreecam") end)
 		pcall(function() CAS:UnbindAction("AuroraFreecamSink") end)
+		pcall(function() if FC.wheel then FC.wheel:Disconnect() FC.wheel = nil end end)
 		pcall(function()
 			local c = FC.ctl or controls()
 			FC.ctl = nil
@@ -4635,11 +4648,19 @@ do
 		end
 		pcall(function()
 			local cam = workspace.CurrentCamera
-			if cam and FC.saved then
-				local hum = lp.Character and lp.Character:FindFirstChildOfClass("Humanoid")
-				cam.CameraType = Enum.CameraType.Custom
-				cam.CameraSubject = hum or FC.saved.subject
+			local sv = FC.saved
+			if cam and sv then
+				if sv.fov then cam.FieldOfView = sv.fov end
+				if sv.type == Enum.CameraType.Scriptable then
+					cam.CameraType = Enum.CameraType.Scriptable
+					cam.CFrame = sv.cf
+				else
+					local hum = lp.Character and lp.Character:FindFirstChildOfClass("Humanoid")
+					cam.CameraType = Enum.CameraType.Custom
+					cam.CameraSubject = hum or sv.subject
+				end
 			end
+			FC.saved = nil
 		end)
 	end
 	-- cikis: once dogrudan kapat, sonra toggle gorunumunu senkronla
@@ -4691,6 +4712,7 @@ do
 	fcS:AddSlider("Fast Multiplier (Shift)", 1, 8, 3, function(v) FC.Fast = v end, 0.5)
 	fcS:AddSlider("Smoothness", 0, 100, 35, function(v) FC.Smooth = v end)
 	fcS:AddSlider("Look Sensitivity", 0.1, 1.5, 0.3, function(v) FC.Sens = v end, 0.05)
+	fcS:AddSlider("Field of View", 30, 120, 70, function(v) FC.FOV = v end)
 end
 
 do
