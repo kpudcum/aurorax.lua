@@ -4461,23 +4461,44 @@ do
 			if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then doExit() end
 		end))
 		if touch then
-			-- bakis alani: tum ekran, kontrollerin altinda
-			local pad = mk("Frame", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Active = true, ZIndex = 1, BorderSizePixel = 0 }, sg)
-			local base = mk("Frame", { Size = UDim2.fromOffset(140, 140), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromOffset(105, vp.Y - 115), BackgroundColor3 = bg, BackgroundTransparency = 0.3, BorderSizePixel = 0, Active = true, ZIndex = 10 }, sg)
+			local base = mk("Frame", { Size = UDim2.fromOffset(140, 140), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromOffset(105, vp.Y - 115), BackgroundColor3 = bg, BackgroundTransparency = 0.3, BorderSizePixel = 0, ZIndex = 10 }, sg)
 			rnd(base, 70)
 			strk(base, accent, 2, 0.2)
 			local knob = mk("Frame", { Size = UDim2.fromOffset(60, 60), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), BackgroundColor3 = accent, BackgroundTransparency = 0.1, BorderSizePixel = 0, ZIndex = 11 }, base)
 			rnd(knob, 30)
 			onAccent(function(a) pcall(function() knob.BackgroundColor3 = a end) end)
-			local jIn, jStart, lookIn = nil, nil, nil
-			table.insert(conns2, base.InputBegan:Connect(function(i)
-				if i.UserInputType == Enum.UserInputType.Touch and not jIn then
+			local function mkBtn(sym, y)
+				local b = mk("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Size = UDim2.fromOffset(64, 64), Position = UDim2.fromOffset(vp.X - 55, vp.Y - y), BackgroundColor3 = bg, BackgroundTransparency = 0.2, BorderSizePixel = 0, ZIndex = 10 }, sg)
+				rnd(b, 32)
+				strk(b, accent, 2, 0.15)
+				txt(b, sym, 24, 11)
+				return b
+			end
+			local upB, dnB = mkBtn("^", 170), mkBtn("v", 95)
+			-- tum dokunmalar dogrudan UIS ile alinir ve kendi bolgelerimizle eslestirilir (GUI katman sorunlarindan bagimsiz)
+			local function hit(f, p, m)
+				m = m or 0
+				local a, z = f.AbsolutePosition, f.AbsoluteSize
+				return p.X >= a.X - m and p.X <= a.X + z.X + m and p.Y >= a.Y - m and p.Y <= a.Y + z.Y + m
+			end
+			local jIn, jStart, lookIn, upIn, dnIn = nil, nil, nil, nil, nil
+			table.insert(conns2, UIS.InputBegan:Connect(function(i)
+				local t = i.UserInputType
+				if t ~= Enum.UserInputType.Touch then return end
+				local p = Vector2.new(i.Position.X, i.Position.Y)
+				if hit(ex, p, 10) then doExit() return end
+				if not jIn and hit(base, p, 25) then
 					jIn = i
 					jStart = base.AbsolutePosition + base.AbsoluteSize / 2
+				elseif not upIn and hit(upB, p, 12) then
+					upIn = i
+					FC.up = 1
+				elseif not dnIn and hit(dnB, p, 12) then
+					dnIn = i
+					FC.up = -1
+				elseif not lookIn then
+					lookIn = i
 				end
-			end))
-			table.insert(conns2, pad.InputBegan:Connect(function(i)
-				if i.UserInputType == Enum.UserInputType.Touch and not lookIn then lookIn = i end
 			end))
 			table.insert(conns2, UIS.InputChanged:Connect(function(i)
 				if i == jIn then
@@ -4496,24 +4517,14 @@ do
 					knob.Position = UDim2.fromScale(0.5, 0.5)
 				elseif i == lookIn then
 					lookIn = nil
+				elseif i == upIn then
+					upIn = nil
+					if FC.up == 1 then FC.up = 0 end
+				elseif i == dnIn then
+					dnIn = nil
+					if FC.up == -1 then FC.up = 0 end
 				end
 			end))
-			local function mkBtn(sym, y, dirv)
-				local b = mk("TextButton", { Text = "", AutoButtonColor = false, AnchorPoint = Vector2.new(0.5, 0.5), Size = UDim2.fromOffset(60, 60), Position = UDim2.fromOffset(vp.X - 55, vp.Y - y), BackgroundColor3 = bg, BackgroundTransparency = 0.2, BorderSizePixel = 0, ZIndex = 10 }, sg)
-				rnd(b, 30)
-				strk(b, accent, 2, 0.15)
-				txt(b, sym, 24, 11)
-				table.insert(conns2, b.InputBegan:Connect(function(i)
-					if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then FC.up = dirv end
-				end))
-				table.insert(conns2, b.InputEnded:Connect(function(i)
-					if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then
-						if FC.up == dirv then FC.up = 0 end
-					end
-				end))
-			end
-			mkBtn("^", 170, 1)
-			mkBtn("v", 95, -1)
 		end
 		return { root = sg, conns = conns2 }
 	end
