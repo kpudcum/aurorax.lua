@@ -645,13 +645,13 @@ function Aurora:CreateWindow(titleText, subtitle)
 		if not gp and i.KeyCode == Enum.KeyCode.RightShift then setOpen(not isOpen) end
 	end))
 	closeB.MouseButton1Click:Connect(function()
-		if os.clock() < (Aurora.NoClose or 0) then return end
+		if Aurora.FCActive or os.clock() < (Aurora.NoClose or 0) then return end
 		warn("[Aurora] X butonuna basildi, pencere kapatiliyor")
 		setOpen(false)
 		task.delay(0.3, function() gui:Destroy() end)
 	end)
 	minB.MouseButton1Click:Connect(function()
-		if os.clock() < (Aurora.NoClose or 0) then return end
+		if Aurora.FCActive or os.clock() < (Aurora.NoClose or 0) then return end
 		setOpen(false)
 		task.delay(0.27, function()
 			if not isOpen then
@@ -4589,6 +4589,7 @@ do
 		FC.vel = Vector3.new(0, 0, 0)
 		FC.mv, FC.up, FC.look, FC.rmb = Vector2.new(0, 0), 0, Vector2.new(0, 0), false
 		FC.On = true
+		Aurora.FCActive = true
 		cam.CameraType = Enum.CameraType.Scriptable
 		-- menu acik kalirsa kontrolleri ortbasar: freecam acilirken menu gizlenir, kapaninca geri acilir
 		FC.wasOpen = Window.IsOpen and Window.IsOpen() or false
@@ -4613,6 +4614,7 @@ do
 	stopFC = function()
 		if not FC.On then return end
 		FC.On = false
+		Aurora.FCActive = false
 		pcall(function() RunService:UnbindFromRenderStep("AuroraFreecam") end)
 		pcall(function() CAS:UnbindAction("AuroraFreecamSink") end)
 		pcall(function()
@@ -4630,10 +4632,12 @@ do
 		FC.ui = nil
 		local reopen = FC.wasOpen and not FC.dying
 		FC.wasOpen = false
+		-- cikista sadece freecam kapanir; menu kisa gecikmeyle geri gelir ve X/minimize bir sure kilitli kalir
+		Aurora.NoClose = os.clock() + 1.6
 		if reopen then
-			-- menu aninda geri gelir; parmak hala ekrandayken X/minimize yanlislikla tetiklenmesin diye kisa koruma
-			Aurora.NoClose = os.clock() + 0.9
-			pcall(function() Window.SetOpen(true) end)
+			task.delay(0.3, function()
+				if gui.Parent then pcall(function() Window.SetOpen(true) end) end
+			end)
 		end
 		pcall(function()
 			local cam = workspace.CurrentCamera
@@ -4655,6 +4659,7 @@ do
 		local ok, e = pcall(stopFC)
 		if not ok then warn("[Aurora] freecam stop: " .. tostring(e)) end
 		FC.On = false
+		Aurora.FCActive = false
 		pcall(function() RunService:UnbindFromRenderStep("AuroraFreecam") end)
 		pcall(function() CAS:UnbindAction("AuroraFreecamSink") end)
 		pcall(function() UIS.MouseBehavior = Enum.MouseBehavior.Default end)
