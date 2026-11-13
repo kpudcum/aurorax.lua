@@ -4449,8 +4449,16 @@ do
 		rnd(ex, 16)
 		strk(ex, Color3.fromRGB(255, 107, 122), 1.5, 0.1)
 		txt(ex, "EXIT FREECAM", 12, 31)
-		table.insert(conns2, ex.Activated:Connect(function()
-			if fcToggle then fcToggle.Set(false) else stopFC() end
+		local exBusy = false
+		local function doExit()
+			if exBusy then return end
+			exBusy = true
+			Aurora.FCExit()
+		end
+		table.insert(conns2, ex.Activated:Connect(doExit))
+		table.insert(conns2, ex.MouseButton1Click:Connect(doExit))
+		table.insert(conns2, ex.InputBegan:Connect(function(i)
+			if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then doExit() end
 		end))
 		if touch then
 			-- bakis alani: tum ekran, kontrollerin altinda
@@ -4590,24 +4598,38 @@ do
 		FC.On = false
 		pcall(function() RunService:UnbindFromRenderStep("AuroraFreecam") end)
 		pcall(function() CAS:UnbindAction("AuroraFreecamSink") end)
-		local c = FC.ctl or controls()
-		FC.ctl = nil
-		if c then pcall(function() c:Enable() end) end
+		pcall(function()
+			local c = FC.ctl or controls()
+			FC.ctl = nil
+			if c then c:Enable() end
+		end)
 		pcall(function() UIS.MouseBehavior = Enum.MouseBehavior.Default end)
-		if FC.ui then
-			for _, cn in ipairs(FC.ui.conns) do cn:Disconnect() end
-			FC.ui.root:Destroy()
-			FC.ui = nil
-		end
-		if FC.wasOpen and not FC.dying and Window.SetOpen then Window.SetOpen(true) end
+		pcall(function()
+			if FC.ui then
+				for _, cn in ipairs(FC.ui.conns) do pcall(function() cn:Disconnect() end) end
+				FC.ui.root:Destroy()
+			end
+		end)
+		FC.ui = nil
+		pcall(function()
+			if FC.wasOpen and not FC.dying and Window.SetOpen then Window.SetOpen(true) end
+		end)
 		FC.wasOpen = false
-		local cam = workspace.CurrentCamera
-		if cam and FC.saved then
-			cam.CameraType = (FC.saved.type == Enum.CameraType.Scriptable) and Enum.CameraType.Custom or FC.saved.type
-			local hum = lp.Character and lp.Character:FindFirstChildOfClass("Humanoid")
-			cam.CameraSubject = FC.saved.subject or hum
-		end
+		pcall(function()
+			local cam = workspace.CurrentCamera
+			if cam and FC.saved then
+				local hum = lp.Character and lp.Character:FindFirstChildOfClass("Humanoid")
+				cam.CameraType = Enum.CameraType.Custom
+				cam.CameraSubject = hum or FC.saved.subject
+			end
+		end)
 	end
+	-- cikis: once dogrudan kapat, sonra toggle gorunumunu senkronla
+	local function exitFC()
+		pcall(stopFC)
+		pcall(function() if fcToggle and fcToggle.Get() then fcToggle.Set(false) end end)
+	end
+	Aurora.FCExit = exitFC
 	gui.Destroying:Connect(function()
 		FC.dying = true
 		stopFC()
