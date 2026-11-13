@@ -4449,11 +4449,10 @@ do
 		rnd(ex, 16)
 		strk(ex, Color3.fromRGB(255, 107, 122), 1.5, 0.1)
 		txt(ex, "EXIT FREECAM", 12, 31)
-		local exBusy = false
 		local function doExit()
-			if exBusy then return end
-			exBusy = true
-			Aurora.FCExit()
+			pcall(function() sg:Destroy() end)
+			local ok, e = pcall(function() Aurora.FCExit() end)
+			if not ok then warn("[Aurora] freecam exit: " .. tostring(e)) end
 		end
 		table.insert(conns2, ex.Activated:Connect(doExit))
 		table.insert(conns2, ex.MouseButton1Click:Connect(doExit))
@@ -4637,7 +4636,18 @@ do
 	end
 	-- cikis: once dogrudan kapat, sonra toggle gorunumunu senkronla
 	local function exitFC()
-		pcall(stopFC)
+		FC.On = true
+		local ok, e = pcall(stopFC)
+		if not ok then warn("[Aurora] freecam stop: " .. tostring(e)) end
+		FC.On = false
+		pcall(function() RunService:UnbindFromRenderStep("AuroraFreecam") end)
+		pcall(function() CAS:UnbindAction("AuroraFreecamSink") end)
+		pcall(function() UIS.MouseBehavior = Enum.MouseBehavior.Default end)
+		pcall(function()
+			for _, o in ipairs(host:GetChildren()) do
+				if o.Name == "AuroraFreecamUI" then o:Destroy() end
+			end
+		end)
 		pcall(function() if fcToggle and fcToggle.Get() then fcToggle.Set(false) end end)
 	end
 	Aurora.FCExit = exitFC
