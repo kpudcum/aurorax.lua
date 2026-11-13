@@ -9,7 +9,7 @@ print("[Aurora] script basladi")
 -- Buraya her oyun icin satir ekle:  [PlaceId] = "o oyunun surumunun raw linki"
 -- Oyundaysan tam menu yerine o link yuklenir. Bos birakirsan (veya link hata verirse) tam menu acilir.
 local GAME_LOADERS = {
-	[106683702021527] = "raw.githubusercontent.com/kpudcum/Aurora-x/refs/heads/main/106683702021527 https://share.google/hK2LcyGjsgGi8QKxl", -- Slap oyunu: aurora_x_slap_lite.lua dosyasinin raw linkini buraya yaz
+	[106683702021527] = "https://raw.githubusercontent.com/kpudcum/Aurora-x/refs/heads/main/106683702021527", -- Slap oyunu
 }
 do
 	local url = GAME_LOADERS[game.PlaceId] or GAME_LOADERS[game.GameId]
