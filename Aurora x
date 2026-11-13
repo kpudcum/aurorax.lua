@@ -645,13 +645,13 @@ function Aurora:CreateWindow(titleText, subtitle)
 		if not gp and i.KeyCode == Enum.KeyCode.RightShift then setOpen(not isOpen) end
 	end))
 	closeB.MouseButton1Click:Connect(function()
-		if os.clock() < (Aurora.NoClose or 0) then return end
+		if Aurora.FCActive or os.clock() < (Aurora.NoClose or 0) then return end
 		warn("[Aurora] X butonuna basildi, pencere kapatiliyor")
 		setOpen(false)
 		task.delay(0.3, function() gui:Destroy() end)
 	end)
 	minB.MouseButton1Click:Connect(function()
-		if os.clock() < (Aurora.NoClose or 0) then return end
+		if Aurora.FCActive or os.clock() < (Aurora.NoClose or 0) then return end
 		setOpen(false)
 		task.delay(0.27, function()
 			if not isOpen then
@@ -4455,6 +4455,7 @@ do
 		local function doExit()
 			if exDone then return end
 			exDone = true
+			Aurora.NoClose = os.clock() + 1.5
 			pcall(function() sg:Destroy() end)
 			local ok, e = pcall(function() Aurora.FCExit() end)
 			if not ok then warn("[Aurora] freecam exit: " .. tostring(e)) end
@@ -4595,6 +4596,7 @@ do
 		FC.vel = Vector3.new(0, 0, 0)
 		FC.mv, FC.up, FC.look, FC.rmb = Vector2.new(0, 0), 0, Vector2.new(0, 0), false
 		FC.On = true
+		Aurora.FCActive = true
 		FC.stream = 0
 		cam.CameraType = Enum.CameraType.Scriptable
 		FC.wheel = UIS.InputChanged:Connect(function(i, gp)
@@ -4623,6 +4625,7 @@ do
 	stopFC = function()
 		if not FC.On then return end
 		FC.On = false
+		Aurora.FCActive = false
 		pcall(function() RunService:UnbindFromRenderStep("AuroraFreecam") end)
 		pcall(function() CAS:UnbindAction("AuroraFreecamSink") end)
 		pcall(function() if FC.wheel then FC.wheel:Disconnect() FC.wheel = nil end end)
@@ -4643,8 +4646,12 @@ do
 		FC.wasOpen = false
 		if reopen then
 			-- menu aninda geri gelir; parmak hala ekrandayken X/minimize yanlislikla tetiklenmesin diye kisa koruma
-			Aurora.NoClose = os.clock() + 0.9
-			pcall(function() Window.SetOpen(true) end)
+			Aurora.NoClose = os.clock() + 1.5
+			task.delay(0.3, function()
+				if FC.On or FC.dying then return end
+				Aurora.NoClose = math.max(Aurora.NoClose or 0, os.clock() + 1.2)
+				pcall(function() Window.SetOpen(true) end)
+			end)
 		end
 		pcall(function()
 			local cam = workspace.CurrentCamera
@@ -5679,7 +5686,7 @@ do
 			i.Changed:Connect(function()
 				if i.UserInputState == Enum.UserInputState.End and pressed then
 					pressed = false
-					if not dragged then panic() end
+					if not dragged and os.clock() >= (Aurora.NoClose or 0) then panic() end
 				end
 			end)
 		end)
