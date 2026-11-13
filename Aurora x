@@ -4449,16 +4449,16 @@ do
 		rnd(ex, 16)
 		strk(ex, Color3.fromRGB(255, 107, 122), 1.5, 0.1)
 		txt(ex, "EXIT FREECAM", 12, 31)
+		local exDone = false
 		local function doExit()
+			if exDone then return end
+			exDone = true
 			pcall(function() sg:Destroy() end)
 			local ok, e = pcall(function() Aurora.FCExit() end)
 			if not ok then warn("[Aurora] freecam exit: " .. tostring(e)) end
 		end
 		table.insert(conns2, ex.Activated:Connect(doExit))
 		table.insert(conns2, ex.MouseButton1Click:Connect(doExit))
-		table.insert(conns2, ex.InputBegan:Connect(function(i)
-			if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then doExit() end
-		end))
 		if touch then
 			local base = mk("Frame", { Size = UDim2.fromOffset(140, 140), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromOffset(105, vp.Y - 115), BackgroundColor3 = bg, BackgroundTransparency = 0.3, BorderSizePixel = 0, ZIndex = 10 }, sg)
 			rnd(base, 70)
@@ -4480,12 +4480,12 @@ do
 				local a, z = f.AbsolutePosition, f.AbsoluteSize
 				return p.X >= a.X - m and p.X <= a.X + z.X + m and p.Y >= a.Y - m and p.Y <= a.Y + z.Y + m
 			end
-			local jIn, jStart, lookIn, upIn, dnIn = nil, nil, nil, nil, nil
+			local jIn, jStart, lookIn, upIn, dnIn, exIn = nil, nil, nil, nil, nil, nil
 			table.insert(conns2, UIS.InputBegan:Connect(function(i)
 				local t = i.UserInputType
 				if t ~= Enum.UserInputType.Touch then return end
 				local p = Vector2.new(i.Position.X, i.Position.Y)
-				if hit(ex, p, 10) then doExit() return end
+				if hit(ex, p, 10) then exIn = i return end
 				if not jIn and hit(base, p, 25) then
 					jIn = i
 					jStart = base.AbsolutePosition + base.AbsoluteSize / 2
@@ -4510,7 +4510,10 @@ do
 				end
 			end))
 			table.insert(conns2, UIS.InputEnded:Connect(function(i)
-				if i == jIn then
+				if i == exIn then
+					exIn = nil
+					if hit(ex, Vector2.new(i.Position.X, i.Position.Y), 14) then doExit() end
+				elseif i == jIn then
 					jIn = nil
 					FC.mv = Vector2.new(0, 0)
 					knob.Position = UDim2.fromScale(0.5, 0.5)
@@ -4621,10 +4624,13 @@ do
 			end
 		end)
 		FC.ui = nil
-		pcall(function()
-			if FC.wasOpen and not FC.dying and Window.SetOpen then Window.SetOpen(true) end
-		end)
+		local reopen = FC.wasOpen and not FC.dying
 		FC.wasOpen = false
+		if reopen then
+			task.delay(0.8, function()
+				if not FC.On and not FC.dying then pcall(function() Window.SetOpen(true) end) end
+			end)
+		end
 		pcall(function()
 			local cam = workspace.CurrentCamera
 			if cam and FC.saved then
