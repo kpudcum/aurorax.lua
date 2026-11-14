@@ -883,40 +883,62 @@ function Aurora:CreateWindow(titleText, subtitle)
 			arrow.Parent = head
 			head.Parent = card
 			local content = new("Frame", { Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1, LayoutOrder = 1 }, { pad(10, 0, 10, 10), list(6) })
-			content.Parent = card
+			-- icerik, yuksekligi canli olculen bir kirpici (wrap) icinde durur: satirlar sonradan uzasa/gec yerlesse bile kirpilmaz
+			local wrap = new("Frame", { Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1, BorderSizePixel = 0, LayoutOrder = 1 })
+			content.Parent = wrap
+			wrap.Parent = card
 			card.Parent = scroll
-			-- kategori acma/kapama: yukseklik yavasca kayarak degisir (kapaliyken icerik kirpilir)
-			local clist = content:FindFirstChildOfClass("UIListLayout")
+			-- kategori acma/kapama: her karede kirpici yuksekligi = ease * icerigin GERCEK yuksekligi (sabit bir olcuye bagli degil)
 			local isOpen = not collapsed
 			local anim = 0
-			local function fullH() return clist.AbsoluteContentSize.Y + 10 end
 			if collapsed then
-				content.AutomaticSize = Enum.AutomaticSize.None
-				content.Size = UDim2.new(1, 0, 0, 0)
-				content.ClipsDescendants = true
+				wrap.AutomaticSize = Enum.AutomaticSize.None
+				wrap.Size = UDim2.new(1, 0, 0, 0)
+				wrap.ClipsDescendants = true
+				wrap.Visible = false
 				arrow.Rotation = -90
+			end
+			local function settle(open)
+				if open then
+					wrap.AutomaticSize = Enum.AutomaticSize.Y
+					wrap.Size = UDim2.new(1, 0, 0, 0)
+					wrap.ClipsDescendants = false
+				else
+					wrap.Size = UDim2.new(1, 0, 0, 0)
+					wrap.Visible = false
+				end
 			end
 			head.MouseButton1Click:Connect(function()
 				isOpen = not isOpen
 				anim = anim + 1
 				local my = anim
-				tween(arrow, 0.28, { Rotation = isOpen and 0 or -90 })
-				content.ClipsDescendants = true
-				if isOpen then
-					content.AutomaticSize = Enum.AutomaticSize.None
-					tween(content, 0.32, { Size = UDim2.new(1, 0, 0, fullH()) }, Enum.EasingStyle.Quint)
-					task.delay(0.36, function()
-						if my == anim and isOpen then
-							content.AutomaticSize = Enum.AutomaticSize.Y
-							content.Size = UDim2.new(1, 0, 0, 0)
-							content.ClipsDescendants = false
-						end
-					end)
-				else
-					content.AutomaticSize = Enum.AutomaticSize.None
-					content.Size = UDim2.new(1, 0, 0, fullH())
-					tween(content, 0.32, { Size = UDim2.new(1, 0, 0, 0) }, Enum.EasingStyle.Quint)
-				end
+				local opening = isOpen
+				tween(arrow, 0.22, { Rotation = opening and 0 or -90 }, Enum.EasingStyle.Quad)
+				task.spawn(function()
+					-- AbsoluteSize ekran pikselidir; menu UIScale ile kucultuldugu icin yerel birime cevrilir (yoksa son satir kirpilir)
+					local function lh(px) return px / math.max(uiscale.Scale, 0.05) end
+					local startH = lh(wrap.AbsoluteSize.Y)
+					wrap.AutomaticSize = Enum.AutomaticSize.None
+					wrap.ClipsDescendants = true
+					if opening then
+						wrap.Size = UDim2.new(1, 0, 0, startH)
+						wrap.Visible = true
+						-- ilk yerlesim/cizim takilmasi animasyonun icine binmesin: bir kare bekle
+						RunService.Heartbeat:Wait()
+					end
+					local dur = opening and 0.28 or 0.22
+					local t0 = os.clock()
+					while my == anim do
+						local a = math.min(1, (os.clock() - t0) / dur)
+						local e = 1 - (1 - a) * (1 - a)
+						local full = lh(content.AbsoluteSize.Y)
+						local h = opening and (startH + (full - startH) * e) or (startH * (1 - e))
+						wrap.Size = UDim2.new(1, 0, 0, math.floor(h + 0.5))
+						if a >= 1 then break end
+						RunService.Heartbeat:Wait()
+					end
+					if my == anim then settle(opening) end
+				end)
 			end)
 
 			local Section = {}
