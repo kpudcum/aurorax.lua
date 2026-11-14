@@ -5882,6 +5882,15 @@ do
 		return items, on
 	end
 
+	-- ortak config dosyasi: bu surumde olmayan kontrollerin (main'deki ozellikler) eski kayitlari kaydederken silinmesin
+	local function keepForeign(items, old)
+		if type(old) ~= "table" or type(old.items) ~= "table" then return items end
+		for _, it in ipairs(old.items) do
+			if type(it) == "table" and it.k and not CTL.map[it.k] then table.insert(items, it) end
+		end
+		return items
+	end
+
 	local applying = false
 	local function applyProfile(name)
 		local prof = store.profiles[name]
@@ -5889,19 +5898,21 @@ do
 		applying = true
 		task.spawn(function()
 			pcall(applyTheme, prof.theme)
-			local n = 0
+			local n, miss = 0, 0
 			for i, it in ipairs(prof.items or {}) do
 				local e = CTL.map[it.k]
 				if e then
 					local v = deser(e.kind, it.v)
 					if v ~= nil and pcall(e.set, v) then n = n + 1 end
+				else
+					miss = miss + 1
 				end
 				if i % 10 == 0 then task.wait() end
 			end
 			applying = false
 			store.last = name
 			writeStore()
-			Aurora:Notify("Config loaded", name .. " - " .. n .. T_(" settings applied"), 3.5, "success")
+			Aurora:Notify("Config loaded", name .. " - " .. n .. T_(" settings applied") .. (miss > 0 and (" (" .. miss .. T_(" not in this game") .. ")") or ""), 3.5, "success")
 		end)
 	end
 
@@ -6000,6 +6011,7 @@ do
 			nm = "Config " .. (c + 1)
 		end
 		local items, on = capture()
+		items = keepForeign(items, store.profiles[nm])
 		store.profiles[nm] = { saved = os.time(), items = items, on = on, n = #items, theme = captureTheme() }
 		store.last = nm
 		writeStore()
@@ -6025,6 +6037,7 @@ do
 		owArm = nil
 		owTok = owTok + 1
 		local items, on = capture()
+		items = keepForeign(items, store.profiles[nm])
 		store.profiles[nm] = { saved = os.time(), items = items, on = on, n = #items, theme = captureTheme() }
 		store.last = nm
 		writeStore()
