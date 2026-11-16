@@ -10,6 +10,7 @@ print("[Aurora] script basladi")
 -- Oyundaysan tam menu yerine o link yuklenir. Bos birakirsan (veya link hata verirse) tam menu acilir.
 local GAME_LOADERS = {
 	[106683702021527] = "https://raw.githubusercontent.com/kpudcum/Aurora-x/refs/heads/main/106683702021527", -- Slap oyunu
+	[13664698400] = "https://raw.githubusercontent.com/kpudcum/Aurora-x/refs/heads/main/13664698400", -- Futbol oyunu (Ball lite)
 }
 do
 	local url = GAME_LOADERS[game.PlaceId] or GAME_LOADERS[game.GameId]
