@@ -11,6 +11,7 @@ print("[Aurora] script basladi")
 local GAME_LOADERS = {
 	[106683702021527] = "https://raw.githubusercontent.com/kpudcum/Aurora-x/refs/heads/main/106683702021527", -- Slap oyunu
 	[13664698400] = "https://raw.githubusercontent.com/kpudcum/Aurora-x/refs/heads/main/13664698400", -- Futbol oyunu (Ball lite)
+    [140409667345323] = "https://raw.githubusercontent.com/kpudcum/Aurora-x/refs/heads/main/140409667345323",  --Aura X
 }
 do
 	local url = GAME_LOADERS[game.PlaceId] or GAME_LOADERS[game.GameId]
