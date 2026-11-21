@@ -379,6 +379,7 @@ function Aurora:CreateWindow(titleText, subtitle)
 	-- MOBIL ICIN DUZENLENDI: Telefon ekranlarinda devasa durmamasi icin otomatik kucultme orani eklendi
 	local isMobile = UIS.TouchEnabled and not UIS.MouseEnabled
 	local initialScale = isMobile and 0.65 or 0.85
+	local customScale = nil
 	local uiscale = new("UIScale", { Scale = initialScale })
 	uiscale.Parent = holder
 	holder.Parent = gui
@@ -395,8 +396,12 @@ function Aurora:CreateWindow(titleText, subtitle)
 	-- slider surukleme sirasinda her harekette tum arayuzu yeniden olceklemek takiliyordu (ve slider'in kendisi de oynuyordu):
 	-- deger kisa bir duraklamadan sonra tek seferde, yumusak bir gecisle uygulanir
 	local scaleTok = 0
+	local function targetScale()
+		return customScale or fitScale()
+	end
 	function Aurora:SetMenuScale(scaleVal)
 		local target = math.clamp(scaleVal, 0.4, 1.5)
+		customScale = target
 		scaleTok = scaleTok + 1
 		local my = scaleTok
 		task.delay(0.12, function()
@@ -404,7 +409,7 @@ function Aurora:CreateWindow(titleText, subtitle)
 		end)
 	end
 	function Aurora:GetMenuScale()
-		return uiscale.Scale
+		return customScale or uiscale.Scale
 	end
 
 	new("ImageLabel", {
@@ -650,10 +655,10 @@ function Aurora:CreateWindow(titleText, subtitle)
 				holder.Position = UDim2.fromOffset(math.floor(vp.X / 2), math.floor(vp.Y / 2))
 			end
 			holder.Visible = true
-			tween(uiscale, 0.5, { Scale = fitScale() }, Enum.EasingStyle.Back)
+			tween(uiscale, 0.5, { Scale = targetScale() }, Enum.EasingStyle.Back)
 			tween(bgLayer, 0.35, { GroupTransparency = 0 })
 		else
-			tween(uiscale, 0.25, { Scale = initialScale }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+			tween(uiscale, 0.25, { Scale = targetScale() * 0.88 }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
 			tween(bgLayer, 0.25, { GroupTransparency = 1 })
 			task.delay(0.26, function() if not isOpen then holder.Visible = false end end)
 		end
